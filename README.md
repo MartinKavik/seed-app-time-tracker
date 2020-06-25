@@ -1,3 +1,9 @@
+# Time Tracker
+
+- https://seed-app-time-tracker.netlify.app/
+
+---
+
 # Seed Quickstart
 
 > Basic Rust-only template for your new Seed app.
