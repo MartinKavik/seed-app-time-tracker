@@ -6,6 +6,11 @@ use seed::{prelude::*, *};
 
 mod page;
 
+const CLIENTS_AND_PROJECTS: &str = "clients_and_projects";
+const TIME_TRACKER: &str = "time_tracker";
+const TIME_BLOCKS: &str = "time_blocks";
+const SETTINGS: &str = "settings";
+
 // ------ ------
 //     Init
 // ------ ------
@@ -48,6 +53,29 @@ enum Page {
     TimeBlocks(page::time_blocks::Model),
     Settings(page::settings::Model),
     NotFound,
+}
+
+// ------ ------
+//     Urls
+// ------ ------
+
+struct_urls!();
+impl<'a> Urls<'a> {
+    fn home(self) -> Url {
+        self.base_url()
+    }
+    fn clients_and_projects(self) -> Url {
+        self.base_url().add_path_part(CLIENTS_AND_PROJECTS)
+    }
+    fn time_tracker(self) -> Url {
+        self.base_url().add_path_part(CLIENTS_AND_PROJECTS)
+    }
+    fn time_blocks(self) -> Url {
+        self.base_url().add_path_part(TIME_BLOCKS)
+    }
+    fn settings(self) -> Url {
+        self.base_url().add_path_part(SETTINGS)
+    }
 }
 
 // ------ ------
