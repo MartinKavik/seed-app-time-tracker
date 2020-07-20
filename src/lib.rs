@@ -15,7 +15,9 @@ const SETTINGS: &str = "settings";
 //     Init
 // ------ ------
 
-fn init(url: Url, _: &mut impl Orders<Msg>) -> Model {
+fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
+    orders.stream(streams::window_event(Ev::Click, |_| Msg::HideMenu));
+
     Model {
         ctx: Context {
             // user: None,
@@ -91,12 +93,20 @@ impl<'a> Urls<'a> {
 enum Msg {
     UrlChanged(subs::UrlChanged),
     ToggleMenu,
+    HideMenu,
 }
 
-fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
+fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::UrlChanged(url) => {},
         Msg::ToggleMenu => model.menu_visible = not(model.menu_visible),
+        Msg::HideMenu => {
+            if model.menu_visible {
+                model.menu_visible = false;
+            } else {
+                orders.skip();
+            }
+        },
     }
 }
 
@@ -137,7 +147,10 @@ fn view_brand_and_hamburger(menu_visible: bool, base_url: &Url) -> Node<Msg> {
                 At::AriaLabel => "menu",
                 At::AriaExpanded => menu_visible,
             },
-            ev(Ev::Click, |_| Msg::ToggleMenu),
+            ev(Ev::Click, |event| {
+                event.stop_propagation();
+                Msg::ToggleMenu
+            }),
             span![attrs!{At::AriaHidden => "true"}],
             span![attrs!{At::AriaHidden => "true"}],
             span![attrs!{At::AriaHidden => "true"}],
