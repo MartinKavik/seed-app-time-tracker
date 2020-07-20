@@ -16,7 +16,9 @@ const SETTINGS: &str = "settings";
 // ------ ------
 
 fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
-    orders.stream(streams::window_event(Ev::Click, |_| Msg::HideMenu));
+    orders
+        .subscribe(Msg::UrlChanged)
+        .stream(streams::window_event(Ev::Click, |_| Msg::HideMenu));
 
     Model {
         ctx: Context {
@@ -28,7 +30,7 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
             token: None,
         },
         base_url: url.to_base_url(),
-        page: Page::Home,
+        page: Page::init(url, orders),
         menu_visible: false,
     }
 }
@@ -54,6 +56,8 @@ struct User {
     email: String,
 }
 
+// ------ Page ------
+
 enum Page {
     Home,
     ClientsAndProjects(page::clients_and_projects::Model),
@@ -61,6 +65,27 @@ enum Page {
     TimeBlocks(page::time_blocks::Model),
     Settings(page::settings::Model),
     NotFound,
+}
+
+impl Page {
+    fn init(mut url: Url, orders: &mut impl Orders<Msg>) -> Self {
+        match url.remaining_path_parts().as_slice() {
+            [] => Self::Home,
+            [CLIENTS_AND_PROJECTS] => Self::ClientsAndProjects(
+                page::clients_and_projects::init(url, &mut orders.proxy(Msg::ClientsAndProjectsMsg))
+            ),
+            [TIME_TRACKER] => Self::TimeTracker(
+                page::time_tracker::init(url, &mut orders.proxy(Msg::TimeTrackerMsg))
+            ),
+            [TIME_BLOCKS] => Self::TimeBlocks(
+                page::time_blocks::init(url, &mut orders.proxy(Msg::TimeBlocksMsg))
+            ),
+            [SETTINGS] => Self::Settings(
+                page::settings::init(url, &mut orders.proxy(Msg::SettingsMsg))
+            ),
+            _ => Self::NotFound,
+        }
+    }
 }
 
 // ------ ------
@@ -94,11 +119,18 @@ enum Msg {
     UrlChanged(subs::UrlChanged),
     ToggleMenu,
     HideMenu,
+
+    // ------ pages ------
+
+    ClientsAndProjectsMsg(page::clients_and_projects::Msg),
+    TimeTrackerMsg(page::time_tracker::Msg),
+    TimeBlocksMsg(page::time_blocks::Msg),
+    SettingsMsg(page::settings::Msg),
 }
 
 fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
-        Msg::UrlChanged(url) => {},
+        Msg::UrlChanged(subs::UrlChanged(url)) => model.page = Page::init(url, orders),
         Msg::ToggleMenu => model.menu_visible = not(model.menu_visible),
         Msg::HideMenu => {
             if model.menu_visible {
@@ -107,6 +139,29 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 orders.skip();
             }
         },
+
+        // ------ pages ------
+
+        Msg::ClientsAndProjectsMsg(msg) => {
+            if let Page::ClientsAndProjects(model) = &mut model.page {
+                page::clients_and_projects::update(msg, model, &mut orders.proxy(Msg::ClientsAndProjectsMsg))
+            }
+        }
+        Msg::TimeTrackerMsg(msg) => {
+            if let Page::TimeTracker(model) = &mut model.page {
+                page::time_tracker::update(msg, model, &mut orders.proxy(Msg::TimeTrackerMsg))
+            }
+        },
+        Msg::TimeBlocksMsg(msg) => {
+            if let Page::TimeBlocks(model) = &mut  model.page {
+                page::time_blocks::update(msg, model, &mut orders.proxy(Msg::TimeBlocksMsg))
+            }
+        }
+        Msg::SettingsMsg(msg) => {
+            if let Page::Settings(model) = &mut model.page {
+                page::settings::update(msg, model, &mut orders.proxy(Msg::SettingsMsg))
+            }
+        }
     }
 }
 
@@ -114,9 +169,30 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 //     View
 // ------ ------
 
-fn view(model: &Model) -> Node<Msg> {
-    view_navbar(model.menu_visible, &model.base_url, model.ctx.user.as_ref())
+fn view(model: &Model) -> Vec<Node<Msg>> {
+    vec![
+        view_navbar(model.menu_visible, &model.base_url, model.ctx.user.as_ref()),
+        view_content(&model.page),
+    ]
 }
+
+// ----- view_content ------
+
+fn view_content(page: &Page) -> Node<Msg> {
+    div![
+        C!["container"],
+        match page {
+            Page::Home => page::home::view(),
+            Page::ClientsAndProjects(model) => page::clients_and_projects::view(model).map_msg(Msg::ClientsAndProjectsMsg),
+            Page::TimeTracker(model) => page::time_tracker::view(model).map_msg(Msg::TimeTrackerMsg),
+            Page::TimeBlocks(model) => page::time_blocks::view(model).map_msg(Msg::TimeBlocksMsg),
+            Page::Settings(model) => page::settings::view(model).map_msg(Msg::SettingsMsg),
+            Page::NotFound => page::not_found::view(),
+        }
+    ]
+}
+
+// ----- view_navbar ------
 
 fn view_navbar(menu_visible: bool, base_url: &Url, user: Option<&User>) -> Node<Msg> {
     nav![
