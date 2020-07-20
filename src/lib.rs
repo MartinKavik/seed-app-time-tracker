@@ -171,7 +171,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 
 fn view(model: &Model) -> Vec<Node<Msg>> {
     vec![
-        view_navbar(model.menu_visible, &model.base_url, model.ctx.user.as_ref()),
+        view_navbar(model.menu_visible, &model.base_url, model.ctx.user.as_ref(), &model.page),
         view_content(&model.page),
     ]
 }
@@ -194,7 +194,7 @@ fn view_content(page: &Page) -> Node<Msg> {
 
 // ----- view_navbar ------
 
-fn view_navbar(menu_visible: bool, base_url: &Url, user: Option<&User>) -> Node<Msg> {
+fn view_navbar(menu_visible: bool, base_url: &Url, user: Option<&User>, page: &Page) -> Node<Msg> {
     nav![
         C!["navbar"],
         attrs!{
@@ -202,7 +202,7 @@ fn view_navbar(menu_visible: bool, base_url: &Url, user: Option<&User>) -> Node<
             At::AriaLabel => "main navigation",
         },
         view_brand_and_hamburger(menu_visible, base_url),
-        view_navbar_menu(menu_visible, base_url, user),
+        view_navbar_menu(menu_visible, base_url, user, page),
     ]
 }
 
@@ -234,29 +234,29 @@ fn view_brand_and_hamburger(menu_visible: bool, base_url: &Url) -> Node<Msg> {
     ]
 }
 
-fn view_navbar_menu(menu_visible: bool, base_url: &Url, user: Option<&User>) -> Node<Msg> {
+fn view_navbar_menu(menu_visible: bool, base_url: &Url, user: Option<&User>, page: &Page) -> Node<Msg> {
     div![
         C!["navbar-menu", IF!(menu_visible => "is-active")],
-        view_navbar_menu_start(base_url),
+        view_navbar_menu_start(base_url, page),
         view_navbar_menu_end(base_url, user),
     ]
 }
 
-fn view_navbar_menu_start(base_url: &Url) -> Node<Msg> {
+fn view_navbar_menu_start(base_url: &Url, page: &Page) -> Node<Msg> {
     div![
         C!["navbar-start"],
         a![
-            C!["navbar-item"],
+            C!["navbar-item", "is-tab", IF!(matches!(page, Page::TimeTracker(_)) => "is-active"),],
             attrs!{At::Href => Urls::new(base_url).time_tracker()},
             "Time Tracker",
         ],
         a![
-            C!["navbar-item"],
+            C!["navbar-item", "is-tab", IF!(matches!(page, Page::ClientsAndProjects(_)) => "is-active"),],
             attrs!{At::Href => Urls::new(base_url).clients_and_projects()},
             "Clients & Projects",
         ],
         a![
-            C!["navbar-item"],
+            C!["navbar-item", "is-tab", IF!(matches!(page, Page::TimeBlocks(_)) => "is-active"),],
             attrs!{At::Href => Urls::new(base_url).time_blocks()},
             "Time Blocks",
         ],
