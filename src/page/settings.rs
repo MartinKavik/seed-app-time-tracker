@@ -69,6 +69,7 @@ pub enum Msg {
     ConfirmPasswordChanged(String),
 
     Save,
+    DeleteAccount,
 }
 
 pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
@@ -83,6 +84,7 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
         Msg::ConfirmPasswordChanged(confirm_password) => {},
 
         Msg::Save => {},
+        Msg::DeleteAccount => {},
     }
 }
 
