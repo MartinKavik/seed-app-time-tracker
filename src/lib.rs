@@ -3,6 +3,7 @@
 #![allow(dead_code, unused_variables)]
 
 use seed::{prelude::*, *};
+use serde::Deserialize;
 
 mod page;
 
@@ -18,7 +19,12 @@ const SETTINGS: &str = "settings";
 fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     orders
         .subscribe(Msg::UrlChanged)
-        .stream(streams::window_event(Ev::Click, |_| Msg::HideMenu));
+        .stream(streams::window_event(Ev::Click, |_| Msg::HideMenu))
+        .perform_cmd(async { 
+            Msg::AuthConfigFetched(
+                async { fetch("/auth_config.json").await?.check_status()?.json().await }.await
+            )
+        });
 
     Model {
         ctx: Context {
@@ -32,6 +38,7 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
         base_url: url.to_base_url(),
         page: Page::init(url, orders),
         menu_visible: false,
+        auth_config: None,
     }
 }
 
@@ -44,6 +51,7 @@ struct Model {
     base_url: Url,
     page: Page,
     menu_visible: bool,
+    auth_config: Option<AuthConfig>,
 }
 
 struct Context {
@@ -88,6 +96,14 @@ impl Page {
     }
 }
 
+// ------ AuthConfig ------
+
+#[derive(Deserialize)]
+struct AuthConfig {
+    domain: String,
+    client_id: String,
+}
+
 // ------ ------
 //     Urls
 // ------ ------
@@ -119,6 +135,7 @@ enum Msg {
     UrlChanged(subs::UrlChanged),
     ToggleMenu,
     HideMenu,
+    AuthConfigFetched(fetch::Result<AuthConfig>),
 
     // ------ pages ------
 
@@ -139,6 +156,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 orders.skip();
             }
         },
+        Msg::AuthConfigFetched(Ok(auth_config)) => model.auth_config = Some(auth_config),
+        Msg::AuthConfigFetched(Err(fetch_error)) => error!("AuthConfig fetch failed!", fetch_error),
 
         // ------ pages ------
 
