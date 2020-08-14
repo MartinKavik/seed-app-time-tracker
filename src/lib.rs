@@ -156,7 +156,12 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 orders.skip();
             }
         },
-        Msg::AuthConfigFetched(Ok(auth_config)) => model.auth_config = Some(auth_config),
+        Msg::AuthConfigFetched(Ok(auth_config)) => {
+            if let Err(error) = create_auth_client(&auth_config.domain, &auth_config.client_id) {
+                error!("Cannot create the auth client!", error);
+            }
+            model.auth_config = Some(auth_config);
+        },
         Msg::AuthConfigFetched(Err(fetch_error)) => error!("AuthConfig fetch failed!", fetch_error),
 
         // ------ pages ------
@@ -182,6 +187,12 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             }
         }
     }
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(catch)]
+    async fn create_auth_client(domain: &str, client_id: &str) -> Result<(), JsValue>;
 }
 
 // ------ ------
