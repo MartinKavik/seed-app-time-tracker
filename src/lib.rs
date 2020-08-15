@@ -28,11 +28,7 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
 
     Model {
         ctx: Context {
-            // user: None,
-            user: Some(User {
-                username: "John".to_owned(),
-                email: "john@email.com".to_owned(),
-            }),
+            user: None,
             token: None,
         },
         base_url: url.to_base_url(),
@@ -59,9 +55,15 @@ struct Context {
     token: Option<String>,
 }
 
+#[derive(Deserialize)]
 struct User {
-    username: String,
+    nickname: String,
+    name: String,
+    picture: String,
+    updated_at: String,
     email: String,
+    email_verified: bool,
+    sub: String,
 }
 
 // ------ Page ------
@@ -136,6 +138,12 @@ enum Msg {
     ToggleMenu,
     HideMenu,
     AuthConfigFetched(fetch::Result<AuthConfig>),
+    AuthInitialized(Result<JsValue, JsValue>),
+    SignUp,
+    LogIn,
+    LogOut,
+    RedirectingToSignUp(Result<(), JsValue>),
+    RedirectingToLogIn(Result<(), JsValue>),
 
     // ------ pages ------
 
@@ -157,12 +165,58 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             }
         },
         Msg::AuthConfigFetched(Ok(auth_config)) => {
-            if let Err(error) = create_auth_client(&auth_config.domain, &auth_config.client_id) {
-                error!("Cannot create the auth client!", error);
-            }
+            let domain = auth_config.domain.clone();
+            let client_id = auth_config.client_id.clone();
+
+            orders.perform_cmd(async { Msg::AuthInitialized(
+                init_auth(domain, client_id).await
+            )});
             model.auth_config = Some(auth_config);
         },
         Msg::AuthConfigFetched(Err(fetch_error)) => error!("AuthConfig fetch failed!", fetch_error),
+        Msg::AuthInitialized(Ok(user)) => {
+            if not(user.is_undefined()) {
+                match serde_wasm_bindgen::from_value(user) {
+                    Ok(user) => model.ctx.user = Some(user),
+                    Err(error) => error!("User deserialization failed!", error),
+                }
+            }
+
+            let search = model.base_url.search_mut();
+            if search.remove("code").is_some() && search.remove("state").is_some() {        
+                model.base_url.go_and_replace();
+            }
+        }
+        Msg::AuthInitialized(Err(error)) => {
+            error!("Auth initialization failed!", error);
+        }
+        Msg::SignUp => {
+            orders.perform_cmd(async { Msg::RedirectingToSignUp(
+                redirect_to_sign_up().await
+            )});
+        },
+        Msg::LogIn => {
+            orders.perform_cmd(async { Msg::RedirectingToLogIn(
+                redirect_to_log_in().await
+            )});
+        },
+        Msg::RedirectingToSignUp(result) => {
+            if let Err(error) = result {
+                error!("Redirect to sign up failed!", error);
+            }
+        },
+        Msg::RedirectingToLogIn(result) => {
+            if let Err(error) = result {
+                error!("Redirect to log in failed!", error);
+            }
+        }
+        Msg::LogOut => {
+            if let Err(error) = logout() {
+                error!("Cannot log out!", error);
+            } else {
+                model.ctx.user = None;
+            }
+        },
 
         // ------ pages ------
 
@@ -192,7 +246,16 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(catch)]
-    async fn create_auth_client(domain: &str, client_id: &str) -> Result<(), JsValue>;
+    async fn init_auth(domain: String, client_id: String) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch)]
+    async fn redirect_to_sign_up() -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
+    async fn redirect_to_log_in() -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
+    fn logout() -> Result<(), JsValue>;
 }
 
 // ------ ------
@@ -317,15 +380,12 @@ fn view_buttons_for_logged_in_user(base_url: &Url, user: &User) -> Vec<Node<Msg>
             attrs![
                 At::Href => Urls::new(base_url).settings(),
             ],
-            strong![&user.username],
+            strong![&user.nickname],
         ],
         a![
             C!["button", "is-light"],
-            attrs![
-                // @TODO: Write the correct href.
-                At::Href => "/"
-            ],
             "Log out",
+            ev(Ev::Click, |_| Msg::LogOut),
         ]
     ]
 }
@@ -334,19 +394,13 @@ fn view_buttons_for_anonymous_user() -> Vec<Node<Msg>> {
     vec![
         a![
             C!["button", "is-primary"],
-            attrs![
-                // @TODO: Write the correct href.
-                At::Href => "/"
-            ],
             strong!["Sign up"],
+            ev(Ev::Click, |_| Msg::SignUp),
         ],
         a![
             C!["button", "is-light"],
-            attrs![
-                // @TODO: Write the correct href.
-                At::Href => "/"
-            ],
             "Log in",
+            ev(Ev::Click, |_| Msg::LogIn),
         ]
     ]
 }

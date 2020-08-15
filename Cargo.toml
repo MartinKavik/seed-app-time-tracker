@@ -22,6 +22,8 @@ seed = { git = "https://github.com/seed-rs/seed", rev = "0a538f0" }
 chrono = "0.4.13"
 ulid = "0.4.0"
 serde = "1.0.115"
+wasm-bindgen-futures = "0.4.17"
+serde-wasm-bindgen = "0.1.3"
 
 [profile.release]
 lto = true
