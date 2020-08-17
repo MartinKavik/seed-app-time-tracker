@@ -1,0 +1,513 @@
+directive @id on FIELD_DEFINITION
+
+directive @withSubscription on OBJECT | INTERFACE
+
+directive @auth(query: AuthRule, add: AuthRule, update: AuthRule, delete: AuthRule) on OBJECT
+
+directive @remote on OBJECT | INTERFACE
+
+directive @hasInverse(field: String!) on FIELD_DEFINITION
+
+directive @cascade on FIELD
+
+directive @search(by: [DgraphIndex!]) on FIELD_DEFINITION
+
+directive @dgraph(type: String, pred: String) on OBJECT | INTERFACE | FIELD_DEFINITION
+
+directive @secret(field: String!, pred: String) on OBJECT | INTERFACE
+
+directive @custom(http: CustomHTTP, dql: String) on FIELD_DEFINITION
+
+input AddClientInput {
+  id: String!
+  name: String!
+  projects: [ProjectRef!]!
+  time_blocks: [TimeBlockRef!]!
+  user: String!
+}
+
+type AddClientPayload {
+  client(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  numUids: Int
+}
+
+input AddInvoiceInput {
+  id: String!
+  custom_id: String
+  url: String
+  time_block: TimeBlockRef!
+}
+
+type AddInvoicePayload {
+  invoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+  numUids: Int
+}
+
+input AddProjectInput {
+  id: String!
+  name: String!
+  time_entries: [TimeEntryRef!]!
+  client: ClientRef!
+}
+
+type AddProjectPayload {
+  project(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  numUids: Int
+}
+
+input AddTimeBlockInput {
+  id: String!
+  name: String!
+  status: TimeBlockStatus!
+  duration: Int!
+  invoice: InvoiceRef
+  client: ClientRef!
+}
+
+type AddTimeBlockPayload {
+  timeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  numUids: Int
+}
+
+input AddTimeEntryInput {
+  id: String!
+  name: String!
+  started: DateTime!
+  stopped: DateTime
+  project: ProjectRef!
+}
+
+type AddTimeEntryPayload {
+  timeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  numUids: Int
+}
+
+input AuthRule {
+  and: [AuthRule]
+  or: [AuthRule]
+  not: AuthRule
+  rule: String
+}
+
+type Client {
+  id: String!
+  name: String!
+  projects(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project!]!
+  time_blocks(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock!]!
+  user: String!
+}
+
+input ClientFilter {
+  id: StringHashFilter
+  and: ClientFilter
+  or: ClientFilter
+  not: ClientFilter
+}
+
+input ClientOrder {
+  asc: ClientOrderable
+  desc: ClientOrderable
+  then: ClientOrder
+}
+
+enum ClientOrderable {
+  id
+  name
+  user
+}
+
+input ClientPatch {
+  name: String
+  projects: [ProjectRef!]
+  time_blocks: [TimeBlockRef!]
+  user: String
+}
+
+input ClientRef {
+  id: String
+  name: String
+  projects: [ProjectRef!]
+  time_blocks: [TimeBlockRef!]
+  user: String
+}
+
+input CustomHTTP {
+  url: String!
+  method: HTTPMethod!
+  body: String
+  graphql: String
+  mode: Mode
+  forwardHeaders: [String!]
+  secretHeaders: [String!]
+  introspectionHeaders: [String!]
+  skipIntrospection: Boolean
+}
+
+scalar DateTime
+
+input DateTimeFilter {
+  eq: DateTime
+  le: DateTime
+  lt: DateTime
+  ge: DateTime
+  gt: DateTime
+}
+
+type DeleteClientPayload {
+  client(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  msg: String
+  numUids: Int
+}
+
+type DeleteInvoicePayload {
+  invoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+  msg: String
+  numUids: Int
+}
+
+type DeleteProjectPayload {
+  project(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  msg: String
+  numUids: Int
+}
+
+type DeleteTimeBlockPayload {
+  timeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  msg: String
+  numUids: Int
+}
+
+type DeleteTimeEntryPayload {
+  timeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  msg: String
+  numUids: Int
+}
+
+enum DgraphIndex {
+  int
+  float
+  bool
+  hash
+  exact
+  term
+  fulltext
+  trigram
+  regexp
+  year
+  month
+  day
+  hour
+}
+
+input FloatFilter {
+  eq: Float
+  le: Float
+  lt: Float
+  ge: Float
+  gt: Float
+}
+
+enum HTTPMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+}
+
+input IntFilter {
+  eq: Int
+  le: Int
+  lt: Int
+  ge: Int
+  gt: Int
+}
+
+type Invoice {
+  id: String!
+  custom_id: String
+  url: String
+  time_block(filter: TimeBlockFilter): TimeBlock!
+}
+
+input InvoiceFilter {
+  id: StringHashFilter
+  and: InvoiceFilter
+  or: InvoiceFilter
+  not: InvoiceFilter
+}
+
+input InvoiceOrder {
+  asc: InvoiceOrderable
+  desc: InvoiceOrderable
+  then: InvoiceOrder
+}
+
+enum InvoiceOrderable {
+  id
+  custom_id
+  url
+}
+
+input InvoicePatch {
+  custom_id: String
+  url: String
+  time_block: TimeBlockRef
+}
+
+input InvoiceRef {
+  id: String
+  custom_id: String
+  url: String
+  time_block: TimeBlockRef
+}
+
+enum Mode {
+  BATCH
+  SINGLE
+}
+
+type Mutation {
+  addClient(input: [AddClientInput!]!): AddClientPayload
+  updateClient(input: UpdateClientInput!): UpdateClientPayload
+  deleteClient(filter: ClientFilter!): DeleteClientPayload
+  addProject(input: [AddProjectInput!]!): AddProjectPayload
+  updateProject(input: UpdateProjectInput!): UpdateProjectPayload
+  deleteProject(filter: ProjectFilter!): DeleteProjectPayload
+  addTimeEntry(input: [AddTimeEntryInput!]!): AddTimeEntryPayload
+  updateTimeEntry(input: UpdateTimeEntryInput!): UpdateTimeEntryPayload
+  deleteTimeEntry(filter: TimeEntryFilter!): DeleteTimeEntryPayload
+  addTimeBlock(input: [AddTimeBlockInput!]!): AddTimeBlockPayload
+  updateTimeBlock(input: UpdateTimeBlockInput!): UpdateTimeBlockPayload
+  deleteTimeBlock(filter: TimeBlockFilter!): DeleteTimeBlockPayload
+  addInvoice(input: [AddInvoiceInput!]!): AddInvoicePayload
+  updateInvoice(input: UpdateInvoiceInput!): UpdateInvoicePayload
+  deleteInvoice(filter: InvoiceFilter!): DeleteInvoicePayload
+}
+
+type Project {
+  id: String!
+  name: String!
+  time_entries(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry!]!
+  client(filter: ClientFilter): Client!
+}
+
+input ProjectFilter {
+  id: StringHashFilter
+  and: ProjectFilter
+  or: ProjectFilter
+  not: ProjectFilter
+}
+
+input ProjectOrder {
+  asc: ProjectOrderable
+  desc: ProjectOrderable
+  then: ProjectOrder
+}
+
+enum ProjectOrderable {
+  id
+  name
+}
+
+input ProjectPatch {
+  name: String
+  time_entries: [TimeEntryRef!]
+  client: ClientRef
+}
+
+input ProjectRef {
+  id: String
+  name: String
+  time_entries: [TimeEntryRef!]
+  client: ClientRef
+}
+
+type Query {
+  getClient(id: String!): Client
+  queryClient(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  getProject(id: String!): Project
+  queryProject(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  getTimeEntry(id: String!): TimeEntry
+  queryTimeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  getTimeBlock(id: String!): TimeBlock
+  queryTimeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  getInvoice(id: String!): Invoice
+  queryInvoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+}
+
+input StringExactFilter {
+  eq: String
+  le: String
+  lt: String
+  ge: String
+  gt: String
+}
+
+input StringFullTextFilter {
+  alloftext: String
+  anyoftext: String
+}
+
+input StringHashFilter {
+  eq: String
+}
+
+input StringRegExpFilter {
+  regexp: String
+}
+
+input StringTermFilter {
+  allofterms: String
+  anyofterms: String
+}
+
+type TimeBlock {
+  id: String!
+  name: String!
+  status: TimeBlockStatus!
+  duration: Int!
+  invoice(filter: InvoiceFilter): Invoice
+  client(filter: ClientFilter): Client!
+}
+
+input TimeBlockFilter {
+  id: StringHashFilter
+  and: TimeBlockFilter
+  or: TimeBlockFilter
+  not: TimeBlockFilter
+}
+
+input TimeBlockOrder {
+  asc: TimeBlockOrderable
+  desc: TimeBlockOrderable
+  then: TimeBlockOrder
+}
+
+enum TimeBlockOrderable {
+  id
+  name
+  duration
+}
+
+input TimeBlockPatch {
+  name: String
+  status: TimeBlockStatus
+  duration: Int
+  invoice: InvoiceRef
+  client: ClientRef
+}
+
+input TimeBlockRef {
+  id: String
+  name: String
+  status: TimeBlockStatus
+  duration: Int
+  invoice: InvoiceRef
+  client: ClientRef
+}
+
+enum TimeBlockStatus {
+  NON_BILLABLE
+  UNPAID
+  PAID
+}
+
+type TimeEntry {
+  id: String!
+  name: String!
+  started: DateTime!
+  stopped: DateTime
+  project(filter: ProjectFilter): Project!
+}
+
+input TimeEntryFilter {
+  id: StringHashFilter
+  and: TimeEntryFilter
+  or: TimeEntryFilter
+  not: TimeEntryFilter
+}
+
+input TimeEntryOrder {
+  asc: TimeEntryOrderable
+  desc: TimeEntryOrderable
+  then: TimeEntryOrder
+}
+
+enum TimeEntryOrderable {
+  id
+  name
+  started
+  stopped
+}
+
+input TimeEntryPatch {
+  name: String
+  started: DateTime
+  stopped: DateTime
+  project: ProjectRef
+}
+
+input TimeEntryRef {
+  id: String
+  name: String
+  started: DateTime
+  stopped: DateTime
+  project: ProjectRef
+}
+
+input UpdateClientInput {
+  filter: ClientFilter!
+  set: ClientPatch
+  remove: ClientPatch
+}
+
+type UpdateClientPayload {
+  client(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  numUids: Int
+}
+
+input UpdateInvoiceInput {
+  filter: InvoiceFilter!
+  set: InvoicePatch
+  remove: InvoicePatch
+}
+
+type UpdateInvoicePayload {
+  invoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+  numUids: Int
+}
+
+input UpdateProjectInput {
+  filter: ProjectFilter!
+  set: ProjectPatch
+  remove: ProjectPatch
+}
+
+type UpdateProjectPayload {
+  project(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  numUids: Int
+}
+
+input UpdateTimeBlockInput {
+  filter: TimeBlockFilter!
+  set: TimeBlockPatch
+  remove: TimeBlockPatch
+}
+
+type UpdateTimeBlockPayload {
+  timeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  numUids: Int
+}
+
+input UpdateTimeEntryInput {
+  filter: TimeEntryFilter!
+  set: TimeEntryPatch
+  remove: TimeEntryPatch
+}
+
+type UpdateTimeEntryPayload {
+  timeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  numUids: Int
+}
+

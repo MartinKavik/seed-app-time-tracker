@@ -6,6 +6,7 @@ use seed::{prelude::*, *};
 use serde::Deserialize;
 
 mod page;
+mod graphql;
 
 const CLIENTS_AND_PROJECTS: &str = "clients_and_projects";
 const TIME_TRACKER: &str = "time_tracker";

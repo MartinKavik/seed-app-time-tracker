@@ -3,7 +3,11 @@ use seed::{prelude::*, *};
 use chrono::prelude::*;
 use ulid::Ulid;
 
+use cynic::QueryFragment;
+
 use std::collections::BTreeMap;
+
+use crate::graphql;
 
 type ClientId = Ulid;
 type ProjectId = Ulid;
@@ -12,13 +16,45 @@ type ProjectId = Ulid;
 //     Init
 // ------ ------
 
-pub fn init(url: Url, _: &mut impl Orders<Msg>) -> Model {
+pub fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
+    orders.perform_cmd(async { Msg::ClientsFetched(request_clients().await) });
+
     Model {
         changes_status: ChangesStatus::NoChanges,
         errors: Vec::new(),
 
-        clients: RemoteData::NotAsked,
+        clients: RemoteData::Loading,
     }
+}
+
+async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
+    let response_data = graphql::send_query(
+        graphql::queries::ClientsWithProjects::fragment(())
+    ).await?;
+
+    let clients = 
+        response_data
+            .query_client
+            .expect("get clients")
+            .into_iter()
+            .filter_map(|client| {
+                client.map(|client|
+                    (
+                        client.id.parse().expect("parse client Ulid"),
+                        Client {
+                            name: client.name,
+                            projects: client.projects.into_iter().map(|project| {
+                                (
+                                    project.id.parse().expect("parse project Ulid"), 
+                                    Project { name: project.name },
+                                )
+                            }).collect()
+                        }
+                    )
+                )
+            })
+            .collect();
+    Ok(clients)
 }
 
 // ------ ------
@@ -27,7 +63,7 @@ pub fn init(url: Url, _: &mut impl Orders<Msg>) -> Model {
 
 pub struct Model {
     changes_status: ChangesStatus,
-    errors: Vec<FetchError>,
+    errors: Vec<graphql::GraphQLError>,
 
     clients: RemoteData<BTreeMap<ClientId, Client>>,
 }
@@ -44,11 +80,13 @@ enum ChangesStatus {
     Saved(DateTime<Local>),
 }
 
+#[derive(Debug)]
 pub struct Client {
     name: String,
     projects: BTreeMap<ProjectId, Project>,
 }
 
+#[derive(Debug)]
 struct Project {
     name: String,
 }
@@ -58,7 +96,7 @@ struct Project {
 // ------ ------
 
 pub enum Msg {
-    ClientsFetched(fetch::Result<BTreeMap<ClientId, Client>>),
+    ClientsFetched(graphql::Result<BTreeMap<ClientId, Client>>),
     ChangesSaved(Option<FetchError>),
     ClearErrors,
     
@@ -81,8 +119,13 @@ pub enum Msg {
 
 pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
-        Msg::ClientsFetched(Ok(clients)) => {},
-        Msg::ClientsFetched(Err(fetch_error)) => {},
+        Msg::ClientsFetched(Ok(clients)) => {
+            log!("Msg::ClientsFetched", clients);
+            model.clients = RemoteData::Loaded(clients);
+        },
+        Msg::ClientsFetched(Err(graphql_error)) => {
+            model.errors.push(graphql_error);
+        },
 
         Msg::ChangesSaved(None) => {},
         Msg::ChangesSaved(Some(fetch_error)) => {},
