@@ -6,6 +6,7 @@ use ulid::Ulid;
 use cynic::QueryFragment;
 
 use std::collections::BTreeMap;
+use std::convert::identity;
 
 use crate::graphql;
 
@@ -24,51 +25,49 @@ pub fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
         changes_status: ChangesStatus::NoChanges,
         errors: Vec::new(),
 
-        clients: RemoteData::NotAsked,
+        clients: RemoteData::Loading,
         timer_handle: orders.stream_with_handle(streams::interval(1000, || Msg::OnSecondTick)),
     }
 }
 
 async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
-    let response_data = graphql::send_query(
-        graphql::queries::clients_with_projects_with_time_entries::Query::fragment(())
-    ).await?;
+    use graphql::queries::clients_with_projects_with_time_entries as query_mod;
 
-    let clients = 
-        response_data
+    let time_entry_mapper = |time_entry: query_mod::TimeEntry| (
+        time_entry.id.parse().expect("parse time_entry Ulid"),
+        TimeEntry {
+            name: time_entry.name,
+            started: time_entry.started.0.parse().expect("parse time_entry started time"),
+            stopped: time_entry.stopped.map(|time| time.0.parse().expect("parse time_entry started time")),
+        }
+    );
+
+    let project_mapper = |project: query_mod::Project| (
+        project.id.parse().expect("parse project Ulid"), 
+        Project { 
+            name: project.name, 
+            time_entries: project.time_entries.into_iter().map(time_entry_mapper).collect()
+        },
+    );
+
+    let client_mapper = |client: query_mod::Client| (
+        client.id.parse().expect("parse client Ulid"),
+        Client {
+            name: client.name,
+            projects: client.projects.into_iter().map(project_mapper).collect()
+        }
+    );
+
+    Ok(
+        graphql::send_query(query_mod::Query::fragment(()))
+            .await?
             .query_client
             .expect("get clients")
             .into_iter()
-            .filter_map(|client| {
-                client.map(|client|
-                    (
-                        client.id.parse().expect("parse client Ulid"),
-                        Client {
-                            name: client.name,
-                            projects: client.projects.into_iter().map(|project| {
-                                (
-                                    project.id.parse().expect("parse project Ulid"), 
-                                    Project { 
-                                        name: project.name, 
-                                        time_entries: project.time_entries.into_iter().map(|time_entry| {
-                                            (
-                                                time_entry.id.parse().expect("parse time_entry Ulid"),
-                                                TimeEntry {
-                                                    name: time_entry.name,
-                                                    started: time_entry.started.0.parse().expect("parse time_entry started time"),
-                                                    stopped: time_entry.stopped.map(|time| time.0.parse().expect("parse time_entry started time")),
-                                                }
-                                            )
-                                        }).collect()
-                                    },
-                                )
-                            }).collect()
-                        }
-                    )
-                )
-            })
-            .collect();
-    Ok(clients)
+            .filter_map(identity)
+            .map(client_mapper)
+            .collect()
+    )
 }
 
 // ------ ------

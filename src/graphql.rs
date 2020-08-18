@@ -10,6 +10,7 @@ pub async fn send_query<'a, ResponseData: 'a, Root: cynic::QueryRoot>(
     let query = cynic::Query::new(selection_set);
 
     let graphql_response = 
+        // @TODO: Move url to a config file.
         Request::new("https://time-tracker.eu-central-1.aws.cloud.dgraph.io/graphql")
             .method(Method::Post)
             .json(&query)?
@@ -65,7 +66,6 @@ pub mod queries {
     pub mod clients_with_projects {
         use crate::graphql::query_dsl;
 
-        ///
         ///```graphql
         ///{
         ///    queryClient {
@@ -107,7 +107,6 @@ pub mod queries {
     pub mod clients_with_projects_with_time_entries {
         use crate::graphql::{query_dsl, types::*};
 
-        ///
         ///```graphql
         ///{
         ///    queryClient {
@@ -158,6 +157,93 @@ pub mod queries {
         }
     }
 
+    #[cynic::query_module(
+        schema_path = "schema.graphql",
+        query_module = "query_dsl",
+    )]
+    pub mod clients_with_time_blocks_and_time_entries {
+        use crate::graphql::{query_dsl, types::*};
+
+        ///```graphql
+        ///{
+        ///    queryClient {
+        ///        id
+        ///        name
+        ///        time_blocks {
+        ///            id
+        ///            name
+        ///            status
+        ///            duration
+        ///            invoice {
+        ///                id
+        ///                custom_id
+        ///                url
+        ///            }
+        ///        }
+        ///        projects {
+        ///            time_entries {
+        ///                started
+        ///                stopped
+        ///            }
+        ///        }
+        ///    }
+        ///}
+        ///```
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Query")]
+        pub struct Query {
+            pub query_client: Option<Vec<Option<Client>>>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Client")]
+        pub struct Client {
+            pub id: String,
+            pub name: String,
+            pub time_blocks: Vec<TimeBlock>,
+            pub projects: Vec<Project>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "TimeBlock")]
+        pub struct TimeBlock {
+            pub id: String,
+            pub name: String,
+            pub status: TimeBlockStatus,
+            pub duration: i32,
+            pub invoice: Option<Invoice>,
+        }
+
+        #[allow(non_camel_case_types)]
+        #[derive(cynic::Enum, Debug, Copy, Clone)]
+        #[cynic(graphql_type = "TimeBlockStatus")]
+        pub enum TimeBlockStatus {
+            NON_BILLABLE,
+            UNPAID,
+            PAID,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Invoice")]
+        pub struct Invoice {
+            pub id: String,
+            pub custom_id: Option<String>,
+            pub url: Option<String>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Project")]
+        pub struct Project {
+            pub time_entries: Vec<TimeEntry>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "TimeEntry")]
+        pub struct TimeEntry {
+            pub started: DateTime,
+            pub stopped: Option<DateTime>,
+        }
+    }
 }
 
 mod types {

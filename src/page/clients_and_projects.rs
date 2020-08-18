@@ -6,6 +6,7 @@ use ulid::Ulid;
 use cynic::QueryFragment;
 
 use std::collections::BTreeMap;
+use std::convert::identity;
 
 use crate::graphql;
 
@@ -28,33 +29,31 @@ pub fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
 }
 
 async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
-    let response_data = graphql::send_query(
-        graphql::queries::clients_with_projects::Query::fragment(())
-    ).await?;
+    use graphql::queries::clients_with_projects as query_mod;
 
-    let clients = 
-        response_data
+    let project_mapper = |project: query_mod::Project| (
+        project.id.parse().expect("parse project Ulid"), 
+        Project { name: project.name }
+    );
+
+    let client_mapper = |client: query_mod::Client| (
+        client.id.parse().expect("parse client Ulid"),
+        Client {
+            name: client.name,
+            projects: client.projects.into_iter().map(project_mapper).collect()
+        }
+    );
+
+    Ok(
+        graphql::send_query(query_mod::Query::fragment(()))
+            .await?
             .query_client
             .expect("get clients")
             .into_iter()
-            .filter_map(|client| {
-                client.map(|client|
-                    (
-                        client.id.parse().expect("parse client Ulid"),
-                        Client {
-                            name: client.name,
-                            projects: client.projects.into_iter().map(|project| {
-                                (
-                                    project.id.parse().expect("parse project Ulid"), 
-                                    Project { name: project.name },
-                                )
-                            }).collect()
-                        }
-                    )
-                )
-            })
-            .collect();
-    Ok(clients)
+            .filter_map(identity)
+            .map(client_mapper)
+            .collect()
+    )
 }
 
 // ------ ------
