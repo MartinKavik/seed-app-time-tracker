@@ -3,7 +3,11 @@ use seed::{prelude::*, *};
 use chrono::prelude::*;
 use ulid::Ulid;
 
+use cynic::QueryFragment;
+
 use std::collections::BTreeMap;
+
+use crate::graphql;
 
 type ClientId = Ulid;
 type ProjectId = Ulid;
@@ -14,6 +18,8 @@ type TimeEntryId = Ulid;
 // ------ ------
 
 pub fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
+    orders.perform_cmd(async { Msg::ClientsFetched(request_clients().await) });
+
     Model {
         changes_status: ChangesStatus::NoChanges,
         errors: Vec::new(),
@@ -23,13 +29,55 @@ pub fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     }
 }
 
+async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
+    let response_data = graphql::send_query(
+        graphql::queries::clients_with_projects_with_time_entries::Query::fragment(())
+    ).await?;
+
+    let clients = 
+        response_data
+            .query_client
+            .expect("get clients")
+            .into_iter()
+            .filter_map(|client| {
+                client.map(|client|
+                    (
+                        client.id.parse().expect("parse client Ulid"),
+                        Client {
+                            name: client.name,
+                            projects: client.projects.into_iter().map(|project| {
+                                (
+                                    project.id.parse().expect("parse project Ulid"), 
+                                    Project { 
+                                        name: project.name, 
+                                        time_entries: project.time_entries.into_iter().map(|time_entry| {
+                                            (
+                                                time_entry.id.parse().expect("parse time_entry Ulid"),
+                                                TimeEntry {
+                                                    name: time_entry.name,
+                                                    started: time_entry.started.0.parse().expect("parse time_entry started time"),
+                                                    stopped: time_entry.stopped.map(|time| time.0.parse().expect("parse time_entry started time")),
+                                                }
+                                            )
+                                        }).collect()
+                                    },
+                                )
+                            }).collect()
+                        }
+                    )
+                )
+            })
+            .collect();
+    Ok(clients)
+}
+
 // ------ ------
 //     Model
 // ------ ------
 
 pub struct Model {
     changes_status: ChangesStatus,
-    errors: Vec<FetchError>,
+    errors: Vec<graphql::GraphQLError>,
 
     clients: RemoteData<BTreeMap<ClientId, Client>>,
     timer_handle: StreamHandle, 
@@ -47,16 +95,19 @@ enum ChangesStatus {
     Saved(DateTime<Local>),
 }
 
+#[derive(Debug)]
 pub struct Client {
     name: String,
     projects: BTreeMap<Ulid, Project>,
 }
 
+#[derive(Debug)]
 struct Project {
     name: String,
     time_entries: BTreeMap<Ulid, TimeEntry>,
 }
 
+#[derive(Debug)]
 struct TimeEntry {
     name: String,
     started: DateTime<Local>,
@@ -68,7 +119,7 @@ struct TimeEntry {
 // ------ ------
 
 pub enum Msg {
-    ClientsFetched(fetch::Result<BTreeMap<ClientId, Client>>),
+    ClientsFetched(graphql::Result<BTreeMap<ClientId, Client>>),
     ChangesSaved(Option<FetchError>),
     ClearErrors,
     
@@ -93,8 +144,13 @@ pub enum Msg {
 
 pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
-        Msg::ClientsFetched(Ok(clients)) => {},
-        Msg::ClientsFetched(Err(fetch_error)) => {},
+        Msg::ClientsFetched(Ok(clients)) => {
+            log!("Msg::ClientsFetched", clients);
+            model.clients = RemoteData::Loaded(clients);
+        },
+        Msg::ClientsFetched(Err(graphql_error)) => {
+            model.errors.push(graphql_error);
+        },
 
         Msg::ChangesSaved(None) => {},
         Msg::ChangesSaved(Some(fetch_error)) => {},

@@ -57,53 +57,112 @@ impl From<cynic::DecodeError> for GraphQLError {
 // GraphQL items
 // ------ ------
 
-#[cynic::query_module(
-    schema_path = "schema.graphql",
-    query_module = "query_dsl",
-)]
 pub mod queries {
-    use super::{query_dsl, types::*};
+    #[cynic::query_module(
+        schema_path = "schema.graphql",
+        query_module = "query_dsl",
+    )]
+    pub mod clients_with_projects {
+        use crate::graphql::query_dsl;
 
-    /*
-    ```graphql
-    query ClientsWithProjects {
-        queryClient {
-            id
-            name
-            projects {
-                id
-                name
-            }
+        ///
+        ///```graphql
+        ///{
+        ///    queryClient {
+        ///        id
+        ///        name
+        ///        projects {
+        ///            id
+        ///            name
+        ///        }
+        ///    }
+        ///}
+        ///```
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Query")]
+        pub struct Query {
+            pub query_client: Option<Vec<Option<Client>>>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Client")]
+        pub struct Client {
+            pub id: String,
+            pub name: String,
+            pub projects: Vec<Project>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Project")]
+        pub struct Project {
+            pub id: String,
+            pub name: String,
         }
     }
-    ```
-    */
-    #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(graphql_type = "Query")]
-    pub struct ClientsWithProjects {
-        pub query_client: Option<Vec<Option<Client>>>,
-    }
 
-    #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(graphql_type = "Client")]
-    pub struct Client {
-        pub id: String,
-        pub name: String,
-        pub projects: Vec<Project>,
-    }
+    #[cynic::query_module(
+        schema_path = "schema.graphql",
+        query_module = "query_dsl",
+    )]
+    pub mod clients_with_projects_with_time_entries {
+        use crate::graphql::{query_dsl, types::*};
 
-    #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(graphql_type = "Project")]
-    pub struct Project {
-        pub id: String,
-        pub name: String,
+        ///
+        ///```graphql
+        ///{
+        ///    queryClient {
+        ///        id
+        ///        name
+        ///        projects {
+        ///            id
+        ///            name
+        ///            time_entries {
+        ///                id
+        ///                name
+        ///                started
+        ///                stopped
+        ///            }
+        ///        }
+        ///    }
+        ///}
+        ///```
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Query")]
+        pub struct Query {
+            pub query_client: Option<Vec<Option<Client>>>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Client")]
+        pub struct Client {
+            pub id: String,
+            pub name: String,
+            pub projects: Vec<Project>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "Project")]
+        pub struct Project {
+            pub id: String,
+            pub name: String,
+            pub time_entries: Vec<TimeEntry>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "TimeEntry")]
+        pub struct TimeEntry {
+            pub id: String,
+            pub name: String,
+            pub started: DateTime,
+            pub stopped: Option<DateTime>,
+        }
     }
 
 }
 
 mod types {
     #[derive(cynic::Scalar, Debug)]
-    pub struct DateTime(String);
+    pub struct DateTime(pub String);
 }
 
 mod query_dsl {

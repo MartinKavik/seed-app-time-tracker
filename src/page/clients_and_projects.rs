@@ -29,7 +29,7 @@ pub fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
 
 async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
     let response_data = graphql::send_query(
-        graphql::queries::ClientsWithProjects::fragment(())
+        graphql::queries::clients_with_projects::Query::fragment(())
     ).await?;
 
     let clients = 
