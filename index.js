@@ -32,7 +32,9 @@ window.redirect_to_log_in = async () => {
 }
 
 window.logout = () => {
-    auth0.logout();
+    auth0.logout({
+        returnTo: window.location.origin
+    });
 }
 
 init('/pkg/package_bg.wasm');
