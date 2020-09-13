@@ -7,7 +7,7 @@ pub type Result<T> = std::result::Result<T, GraphQLError>;
 pub async fn send_query<'a, ResponseData: 'a, Root: cynic::QueryRoot>(
     selection_set: cynic::SelectionSet<'a, ResponseData, Root>
 ) -> Result<ResponseData> {
-    let query = cynic::Query::new(selection_set);
+    let query = cynic::Operation::query(selection_set);
 
     let graphql_response = 
         // @TODO: Move url to a config file.
