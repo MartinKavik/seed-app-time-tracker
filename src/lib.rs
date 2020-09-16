@@ -266,17 +266,17 @@ extern "C" {
 fn view(model: &Model) -> Vec<Node<Msg>> {
     vec![
         view_navbar(model.menu_visible, &model.base_url, model.ctx.user.as_ref(), &model.page),
-        view_content(&model.page),
+        view_content(&model.page, &model.base_url),
     ]
 }
 
 // ----- view_content ------
 
-fn view_content(page: &Page) -> Node<Msg> {
+fn view_content(page: &Page, base_url: &Url) -> Node<Msg> {
     div![
         C!["container"],
         match page {
-            Page::Home => page::home::view(),
+            Page::Home => page::home::view(base_url),
             Page::ClientsAndProjects(model) => page::clients_and_projects::view(model).map_msg(Msg::ClientsAndProjectsMsg),
             Page::TimeTracker(model) => page::time_tracker::view(model).map_msg(Msg::TimeTrackerMsg),
             Page::TimeBlocks(model) => page::time_blocks::view(model).map_msg(Msg::TimeBlocksMsg),
