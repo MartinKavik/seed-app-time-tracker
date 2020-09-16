@@ -12,8 +12,8 @@ pub fn view<Ms>(base_url: &Url) -> Node<Ms> {
                     "seed-rs.org"
                 ]
             ],
-            a![C!["button", "is-primary", "mt-5"], attrs!{At::Href => Urls::new(base_url).time_tracker()},
-                "Go to Time Tracker"
+            a![C!["button", "is-primary", "mt-5", "is-size-5"], attrs!{At::Href => Urls::new(base_url).time_tracker()},
+                strong!["Go to Time Tracker"],
             ],
         ]
     ]
