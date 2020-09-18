@@ -69,17 +69,31 @@ pub struct Model {
     clients: RemoteData<BTreeMap<ClientId, Client>>,
 }
 
+enum ChangesStatus {
+    NoChanges,
+    Saving { requests_in_flight: usize },
+    Saved(DateTime<Local>),
+}
+
+// ---- Remote Data ----
+
 enum RemoteData<T> {
     NotAsked,
     Loading,
     Loaded(T),
 }
 
-enum ChangesStatus {
-    NoChanges,
-    Saving { requests_in_flight: usize },
-    Saved(DateTime<Local>),
+impl<T> RemoteData<T> {
+    fn loaded_mut(&mut self) -> Option<&mut T> {
+        if let Self::Loaded(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
 }
+
+// --- Entities ----
 
 #[derive(Debug)]
 pub struct Client {
@@ -149,12 +163,15 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
         },
 
         Msg::ClientNameChanged(client_id, name) => {
-            if let RemoteData::Loaded(clients) = &mut model.clients {
-                if let Some(client) = clients.get_mut(&client_id) {
-                    log!("Msg::ClientNameChanged", client_id, name);
-                    client.name = name;
-                }
-            }
+            let mut set_client_name = move |name| -> Option<()> {
+                Some(model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .name = name)
+            };
+            log!("Msg::ClientNameChanged", client_id, name);
+            set_client_name(name);
         },
         Msg::SaveClientName(client_id) => {
             log!("Msg::SaveClientName", client_id);
@@ -170,14 +187,17 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
         },
 
         Msg::ProjectNameChanged(client_id, project_id, name) => {
-            if let RemoteData::Loaded(clients) = &mut model.clients {
-                if let Some(client) = clients.get_mut(&client_id) {
-                    if let Some(project) = client.projects.get_mut(&project_id) {
-                        log!("Msg::ProjectNameChanged", client_id, name);
-                        project.name = name;
-                    }
-                }
-            }
+            let mut set_project_name = move |name| -> Option<()> {
+                Some(model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .projects
+                    .get_mut(&project_id)?
+                    .name = name)
+            };
+            log!("Msg::ProjectNameChanged", client_id, project_id, name);
+            set_project_name(name);
         },
         Msg::SaveProjectName(client_id, project_id) => {
             log!("Msg::SaveProjectName", client_id, project_id);
