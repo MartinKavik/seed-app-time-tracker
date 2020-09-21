@@ -35,14 +35,18 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
 
     let project_mapper = |project: query_mod::Project| (
         project.id.parse().expect("parse project Ulid"), 
-        Project { name: project.name }
+        Project { 
+            name: project.name, 
+            name_input: ElRef::new(), 
+        }
     );
 
     let client_mapper = |client: query_mod::Client| (
         client.id.parse().expect("parse client Ulid"),
         Client {
             name: client.name,
-            projects: client.projects.into_iter().map(project_mapper).collect()
+            projects: client.projects.into_iter().map(project_mapper).collect(),
+            name_input: ElRef::new(),
         }
     );
 
@@ -99,11 +103,13 @@ impl<T> RemoteData<T> {
 pub struct Client {
     name: String,
     projects: BTreeMap<ProjectId, Project>,
+    name_input: ElRef<web_sys::HtmlInputElement>,
 }
 
 #[derive(Debug)]
 struct Project {
     name: String,
+    name_input: ElRef<web_sys::HtmlInputElement>,
 }
 
 // ------ ------
@@ -119,6 +125,7 @@ pub enum Msg {
 
     AddClient,
     DeleteClient(ClientId),
+    FocusClientName(ClientId),
 
     ClientNameChanged(ClientId, String),
     SaveClientName(ClientId),
@@ -127,15 +134,15 @@ pub enum Msg {
 
     AddProject(ClientId),
     DeleteProject(ClientId, ProjectId),
+    FocusProjectName(ClientId, ProjectId),
     
     ProjectNameChanged(ClientId, ProjectId, String),
     SaveProjectName(ClientId, ProjectId),
 }
 
-pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
+pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::ClientsFetched(Ok(clients)) => {
-            log!("Msg::ClientsFetched", clients);
             model.clients = RemoteData::Loaded(clients);
         },
         Msg::ClientsFetched(Err(graphql_error)) => {
@@ -150,17 +157,50 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
         },
 
         Msg::ClearErrors => {
-            log!("Msg::ClearErrors");
+            model.errors.clear();
         },
 
         // ------ Client ------
 
         Msg::AddClient => {
-            log!("Msg::AddClient");
+            if let Some(clients) = model.clients.loaded_mut() {
+                let client_id = ClientId::new();
+                let client = Client {
+                    name: "".to_owned(),
+                    projects: BTreeMap::new(),
+                    name_input: ElRef::new(),
+                };
+                // @TODO: Send request.
+                clients.insert(client_id, client);
+                orders.after_next_render(move |_| Msg::FocusClientName(client_id));
+            }
         },
         Msg::DeleteClient(client_id) => {
-            log!("Msg::DeleteClient", client_id);
+            let mut delete_client = move |client_id| -> Option<()> {
+                let clients = model.clients.loaded_mut()?;
+                let client_name = clients.get(&client_id).map(|client| &client.name)?;
+
+                if let Ok(true) = window().confirm_with_message(&format!("Client \"{}\" will be deleted.", client_name)) {
+                    clients.remove(&client_id);
+                    // @TODO: Send request.
+                }
+                Some(())
+            };
+            delete_client(client_id);
         },
+        Msg::FocusClientName(client_id) => {
+            let mut focus_client_name = move |client_id| -> Option<()> {
+                model
+                    .clients
+                    .loaded_mut()?
+                    .get(&client_id)?
+                    .name_input
+                    .get()?
+                    .focus()
+                    .ok()
+            };
+            focus_client_name(client_id);
+        }
 
         Msg::ClientNameChanged(client_id, name) => {
             let mut set_client_name = move |name| -> Option<()> {
@@ -170,21 +210,59 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&client_id)?
                     .name = name)
             };
-            log!("Msg::ClientNameChanged", client_id, name);
             set_client_name(name);
         },
         Msg::SaveClientName(client_id) => {
-            log!("Msg::SaveClientName", client_id);
+            // @TODO: Send request.
         },
 
         // ------ Project ------
 
         Msg::AddProject(client_id) => {
-            log!("Msg::AddProject", client_id);
+            let mut add_project = move |client_id| -> Option<()> {
+                let projects = &mut model.clients.loaded_mut()?.get_mut(&client_id)?.projects;
+
+                let project_id = ProjectId::new();
+                let project = Project {
+                    name: "".to_owned(),
+                    name_input: ElRef::new(),
+                };
+                // @TODO: Send request.
+                projects.insert(project_id, project);
+                orders.after_next_render(move |_| Msg::FocusProjectName(client_id, project_id));
+
+                Some(())
+            };
+            add_project(client_id);
         },
         Msg::DeleteProject(client_id, project_id) => {
-            log!("Msg::DeleteProject", client_id, project_id);
+            let mut delete_project = move |client_id, project_id| -> Option<()> {
+                let projects = &mut model.clients.loaded_mut()?.get_mut(&client_id)?.projects;
+                let project_name = projects.get(&project_id).map(|project| &project.name)?;
+
+                if let Ok(true) = window().confirm_with_message(&format!("Project \"{}\" will be deleted.", project_name)) {
+                    projects.remove(&project_id);
+                    // @TODO: Send request.
+                }
+                Some(())
+            };
+            delete_project(client_id, project_id);
         },
+        Msg::FocusProjectName(client_id, project_id) => {
+            let mut focus_project_name = move |client_id, project_id| -> Option<()> {
+                model
+                    .clients
+                    .loaded_mut()?
+                    .get(&client_id)?
+                    .projects
+                    .get(&project_id)?
+                    .name_input
+                    .get()?
+                    .focus()
+                    .ok()
+            };
+            focus_project_name(client_id, project_id);
+        }
 
         Msg::ProjectNameChanged(client_id, project_id, name) => {
             let mut set_project_name = move |name| -> Option<()> {
@@ -196,11 +274,10 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&project_id)?
                     .name = name)
             };
-            log!("Msg::ProjectNameChanged", client_id, project_id, name);
             set_project_name(name);
         },
         Msg::SaveProjectName(client_id, project_id) => {
-            log!("Msg::SaveProjectName", client_id, project_id);
+            // @TODO: Send request.
         },
     }
 }
@@ -250,6 +327,7 @@ fn view_client(client_id: ClientId, client: &Client) -> Node<Msg> {
     div![C!["box", "has-background-link", "mt-6"],
         div![C!["level", "is-mobile"],
             input![C!["input", "is-size-3", "has-text-link-light"], 
+                el_ref(&client.name_input),
                 style!{
                     St::BoxShadow => "none",
                     St::BackgroundColor => "transparent",
@@ -289,6 +367,7 @@ fn view_project(client_id: ClientId, project_id: ProjectId, project: &Project) -
     div![C!["box"],
         div![C!["level", "is-mobile"],
             input![C!["input", "is-size-4"], 
+                el_ref(&project.name_input),
                 style!{
                     St::BoxShadow => "none",
                     St::BackgroundColor => "transparent",
