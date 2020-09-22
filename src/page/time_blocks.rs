@@ -57,6 +57,7 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
             duration: Duration::seconds(i64::from(time_block.duration)),
             duration_change: None,
             invoice: time_block.invoice.map(invoice_mapper),
+            name_input: ElRef::new(),
         }
     );
 
@@ -151,6 +152,7 @@ struct TimeBlock {
     duration: Duration,
     duration_change: Option<String>,
     invoice: Option<Invoice>,
+    name_input: ElRef<web_sys::HtmlInputElement>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -180,6 +182,7 @@ pub enum Msg {
     AddTimeBlock(ClientId),
     DeleteTimeBlock(ClientId, TimeBlockId),
     SetTimeBlockStatus(ClientId, TimeBlockId, TimeBlockStatus),
+    FocusTimeBlockName(ClientId, TimeBlockId),
 
     TimeBlockNameChanged(ClientId, TimeBlockId, String),
     SaveTimeBlockName(ClientId, TimeBlockId),
@@ -199,10 +202,9 @@ pub enum Msg {
     SaveInvoiceUrl(ClientId, TimeBlockId),
 }
 
-pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
+pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::ClientsFetched(Ok(clients)) => {
-            log!("Msg::ClientsFetched", clients);
             model.clients = RemoteData::Loaded(clients);
         },
         Msg::ClientsFetched(Err(graphql_error)) => {
@@ -216,19 +218,80 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
             log!("Msg::ChangesSaved", fetch_error);
         },
 
-        Msg::ClearErrors => {},
+        Msg::ClearErrors => {
+            model.errors.clear();
+        },
 
         // ------ TimeBlock ------
         
         Msg::AddTimeBlock(client_id) => {
-            log!("Msg::AddTimeBlock", client_id);
+            let mut add_time_block = move |client_id| -> Option<()> {
+                let time_blocks = &mut model.clients.loaded_mut()?.get_mut(&client_id)?.time_blocks;
+
+                let previous_duration = time_blocks
+                    .iter()
+                    .next_back()
+                    .map(|(_, time_block)| time_block.duration);
+
+                let time_block_id = TimeBlockId::new();
+                let time_block = TimeBlock {
+                    name: "".to_owned(),
+                    status: TimeBlockStatus::Unpaid,
+                    duration: previous_duration.unwrap_or_else(|| chrono::Duration::hours(20)),
+                    duration_change: None,
+                    invoice: None,
+                    name_input: ElRef::new(),
+                };
+                // @TODO: Send request.
+                time_blocks.insert(time_block_id, time_block);
+                orders.after_next_render(move |_| Msg::FocusTimeBlockName(client_id, time_block_id));
+
+                Some(())
+            };
+            add_time_block(client_id);
         },
         Msg::DeleteTimeBlock(client_id, time_block_id) => {
-            log!("Msg::DeleteTimeBlock", client_id, time_block_id);
+            let mut delete_time_block = move |client_id, time_block_id| -> Option<()> {
+                let time_blocks = &mut model.clients.loaded_mut()?.get_mut(&client_id)?.time_blocks;
+                let time_block_name = time_blocks.get(&time_block_id).map(|time_block| &time_block.name)?;
+
+                if let Ok(true) = window().confirm_with_message(&format!("Time Block \"{}\" will be deleted.", time_block_name)) {
+                    time_blocks.remove(&time_block_id);
+                    // @TODO: Send request.
+                }
+                Some(())
+            };
+            delete_time_block(client_id, time_block_id);
         },
         Msg::SetTimeBlockStatus(client_id, time_block_id, time_block_status) => {
-            log!("Msg::SetTimeBlockStatus", client_id, time_block_id, time_block_status);
+            let mut set_time_block_status = move |status| -> Option<()> {
+                model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .time_blocks
+                    .get_mut(&time_block_id)?
+                    .status = status;
+                // @TODO: Send request.
+                Some(())
+            };
+            set_time_block_status(time_block_status);
         },
+        Msg::FocusTimeBlockName(client_id, time_block_id) => {
+            let mut focus_time_block_name = move |client_id, time_block_id| -> Option<()> {
+                model
+                    .clients
+                    .loaded_mut()?
+                    .get(&client_id)?
+                    .time_blocks
+                    .get(&time_block_id)?
+                    .name_input
+                    .get()?
+                    .focus()
+                    .ok()
+            };
+            focus_time_block_name(client_id, time_block_id);
+        }
 
         Msg::TimeBlockNameChanged(client_id, time_block_id, name) => {
             let mut set_time_block_name = move |name| -> Option<()> {
@@ -240,11 +303,10 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_block_id)?
                     .name = name)
             };
-            log!("Msg::TimeBlockNameChanged", client_id, time_block_id, name);
             set_time_block_name(name);
         },
         Msg::SaveTimeBlockName(client_id, time_block_id) => {
-            log!("Msg::SaveTimeBlockName", client_id, time_block_id);
+            // @TODO: Send request.
         },
 
         Msg::TimeBlockDurationChanged(client_id, time_block_id, duration) => {
@@ -257,34 +319,66 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_block_id)?
                     .duration_change = Some(duration))
             };
-            log!("Msg::TimeBlockDurationChanged", client_id, time_block_id, duration);
             set_time_block_duration_change(duration);
         },
         Msg::SaveTimeBlockDuration(client_id, time_block_id) => {
-            let mut set_time_block_duration_change = move || -> Option<()> {
-                Some(model
+            let mut set_time_block_duration = move || -> Option<()> {
+                let time_block = model
                     .clients
                     .loaded_mut()?
                     .get_mut(&client_id)?
                     .time_blocks
-                    .get_mut(&time_block_id)?
-                    .duration_change = None)
+                    .get_mut(&time_block_id)?;
+
+                let hours = time_block.duration_change.take()?.parse::<f64>().ok()?;
+                time_block.duration = chrono::Duration::seconds((hours * 3600.0) as i64);
+                // @TODO: Send request.
+                Some(())
             };
-            log!("Msg::SaveTimeBlockDuration", client_id, time_block_id);
-            set_time_block_duration_change();
+            set_time_block_duration();
         },
 
         // ------ Invoice ------
 
         Msg::AttachInvoice(client_id, time_block_id) => {
-            log!("Msg::AttachInvoice", client_id, time_block_id);
+            let mut attach_invoice = move |client_id, time_block_id| -> Option<()> {
+                let time_block = model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .time_blocks
+                    .get_mut(&time_block_id)?;
+
+                let invoice = Invoice {
+                    custom_id: Some("".to_owned()),
+                    url: Some("".to_owned()),
+                };
+                // @TODO: Send request.
+                time_block.invoice = Some(invoice);
+                Some(())
+            };
+            attach_invoice(client_id, time_block_id);
         },
         Msg::DeleteInvoice(client_id, time_block_id) => {
-            log!("Msg::DeleteInvoice", client_id, time_block_id);
+            let mut delete_invoice = move |client_id, time_block_id| -> Option<()> {
+                let time_block = model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .time_blocks
+                    .get_mut(&time_block_id)?;
+
+                if let Ok(true) = window().confirm_with_message(&format!("Invoice attached to Time Block \"{}\" will be deleted.", time_block.name)) {
+                    time_block.invoice = None;
+                    // @TODO: Send request.
+                }
+                Some(())
+            };
+            delete_invoice(client_id, time_block_id);
         },
 
         Msg::InvoiceCustomIdChanged(client_id, time_block_id, custom_id) => {
-            let mut set_invoice_custom_id = move |custom_id| -> Option<()> {
+            let mut set_invoice_custom_id = move |client_id, time_block_id, custom_id| -> Option<()> {
                 Some(model
                     .clients
                     .loaded_mut()?
@@ -294,16 +388,14 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .invoice.as_mut()?
                     .custom_id = Some(custom_id))
             };
-            log!("Msg::InvoiceCustomIdChanged", client_id, time_block_id, custom_id);
-            set_invoice_custom_id(custom_id);
-            
+            set_invoice_custom_id(client_id, time_block_id, custom_id);
         },
         Msg::SaveInvoiceCustomId(client_id, time_block_id) => {
-            log!("Msg::SaveInvoiceCustomId", client_id, time_block_id);
+            // @TODO: Send request.
         },
 
         Msg::InvoiceUrlChanged(client_id, time_block_id, url) => {
-            let mut set_invoice_url = move |url| -> Option<()> {
+            let mut set_invoice_url = move |client_id, time_block_id, url| -> Option<()> {
                 Some(model
                     .clients
                     .loaded_mut()?
@@ -313,11 +405,10 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .invoice.as_mut()?
                     .url = Some(url))
             };
-            log!("Msg::InvoiceUrlChanged", client_id, time_block_id, url);
-            set_invoice_url(url);
+            set_invoice_url(client_id, time_block_id, url);
         },
         Msg::SaveInvoiceUrl(client_id, time_block_id) => {
-            log!("Msg::SaveInvoiceUrl", client_id, time_block_id);
+            // @TODO: Send request.
         },
     }
 }
@@ -427,7 +518,8 @@ fn view_add_time_block_button(client_id: ClientId) -> Node<Msg> {
 fn view_time_block(client_id: ClientId, time_block_id: TimeBlockId, time_block: &TimeBlock) -> Node<Msg> {
     div![C!["box"],
         div![C!["level", "is-mobile"],
-            input![C!["input", "is-size-4"], 
+            input![C!["input", "is-size-4"],
+                el_ref(&time_block.name_input),
                 style!{
                     St::BoxShadow => "none",
                     St::BackgroundColor => "transparent",

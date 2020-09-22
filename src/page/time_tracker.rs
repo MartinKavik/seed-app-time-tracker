@@ -174,7 +174,6 @@ pub enum Msg {
 pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
         Msg::ClientsFetched(Ok(clients)) => {
-            log!("Msg::ClientsFetched", clients);
             model.clients = RemoteData::Loaded(clients);
         },
         Msg::ClientsFetched(Err(graphql_error)) => {
@@ -189,18 +188,76 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
         },
 
         Msg::ClearErrors => {
-            log!("Msg::ClearErrors");
+            model.errors.clear();
         },
 
         Msg::Start(client_id, project_id) => {
-            log!("Msg::Start", client_id, project_id);
+            let mut start_time_entry = move |client_id, project_id| -> Option<()> {
+                let time_entries = &mut model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .projects
+                    .get_mut(&project_id)?
+                    .time_entries;
+
+                let previous_name = time_entries
+                    .iter()
+                    .next_back()
+                    .map(|(_, time_entry)| time_entry.name.to_owned());
+
+                let time_entry_id = TimeEntryId::new();
+                let time_entry = TimeEntry {
+                    name: previous_name.unwrap_or_default(),
+                    started: chrono::Local::now(),
+                    stopped: None,
+                    change: None,
+                };
+                // @TODO: Send request.
+                time_entries.insert(time_entry_id, time_entry);
+
+                Some(())
+            };
+            start_time_entry(client_id, project_id);
         },
         Msg::Stop(client_id, project_id) => {
-            log!("Msg::Stop", client_id, project_id);
+            let mut stop_time_entry = move |client_id, project_id| -> Option<()> {
+                let (time_entry_id, time_entry) = model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .projects
+                    .get_mut(&project_id)?
+                    .time_entries
+                    .iter_mut()
+                    .find(|(_, time_entry)| time_entry.stopped.is_none())?;
+                
+                time_entry.stopped = Some(chrono::Local::now());
+                // @TODO: Send request.
+                Some(())
+            };
+            stop_time_entry(client_id, project_id);
         },
 
         Msg::DeleteTimeEntry(client_id, project_id, time_entry_id) => {
-            log!("Msg::DeleteTimeEntry", client_id, project_id, time_entry_id);
+            let mut delete_time_entry = move |client_id, project_id, time_entry_id| -> Option<()> {
+                let time_entries = &mut model
+                    .clients
+                    .loaded_mut()?
+                    .get_mut(&client_id)?
+                    .projects
+                    .get_mut(&project_id)?
+                    .time_entries;
+
+                let time_entry_name = &time_entries.get_mut(&time_entry_id)?.name;
+
+                if let Ok(true) = window().confirm_with_message(&format!("Time Entry \"{}\" will be deleted.", time_entry_name)) {
+                    time_entries.remove(&time_entry_id);
+                    // @TODO: Send request.
+                }
+                Some(())
+            };
+            delete_time_entry(client_id, project_id, time_entry_id);
         },
 
         Msg::TimeEntryNameChanged(client_id, project_id, time_entry_id, name) => {
@@ -215,11 +272,10 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_entry_id)?
                     .name = name)
             };
-            log!("Msg::TimeEntryNameChanged", client_id, project_id, time_entry_id, name);
             set_time_entry_name(name);
         },
         Msg::SaveTimeEntryName(client_id, project_id, time_entry_id) => {
-            log!("Msg::SaveTimeEntryName", client_id, project_id, time_entry_id);
+            // @TODO: Send request.
         },
 
         Msg::TimeEntryStartedDateChanged(client_id, project_id, time_entry_id, date) => {
@@ -234,7 +290,6 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_entry_id)?
                     .change = Some(change))
             };
-            log!("Msg::TimeEntryStartedDateChanged", client_id, project_id, time_entry_id, date);
             set_time_entry_change(TimeEntryChange::StartedDate(date));
         },
         Msg::TimeEntryStartedTimeChanged(client_id, project_id, time_entry_id, time) => {
@@ -249,7 +304,6 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_entry_id)?
                     .change = Some(change))
             };
-            log!("Msg::TimeEntryStartedTimeChanged", client_id, project_id, time_entry_id, time);
             set_time_entry_change(TimeEntryChange::StartedTime(time));
         },
 
@@ -265,7 +319,6 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_entry_id)?
                     .change = Some(change))
             };
-            log!("Msg::TimeEntryDurationChanged", client_id, project_id, time_entry_id, duration);
             set_time_entry_change(TimeEntryChange::Duration(duration));
         },
 
@@ -281,7 +334,6 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_entry_id)?
                     .change = Some(change))
             };
-            log!("Msg::TimeEntryStoppedDateChanged", client_id, project_id, time_entry_id, date);
             set_time_entry_change(TimeEntryChange::StoppedDate(date));
         },
         Msg::TimeEntryStoppedTimeChanged(client_id, project_id, time_entry_id, time) => {
@@ -296,24 +348,63 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .get_mut(&time_entry_id)?
                     .change = Some(change))
             };
-            log!("Msg::TimeEntryStoppedTimeChanged", client_id, project_id, time_entry_id, time);
             set_time_entry_change(TimeEntryChange::StoppedTime(time));
         },
 
         Msg::SaveTimeEntryChange(client_id, project_id, time_entry_id) => {
-            let mut delete_time_entry_change = move || -> Option<()> {
-                Some(model
+            let mut save_time_entry_change = move || -> Option<()> {
+                let time_entry = model
                     .clients
                     .loaded_mut()?
                     .get_mut(&client_id)?
                     .projects
                     .get_mut(&project_id)?
                     .time_entries
-                    .get_mut(&time_entry_id)?
-                    .change = None)
+                    .get_mut(&time_entry_id)?;
+
+                match time_entry.change.take()? {
+                    TimeEntryChange::StartedDate(date) => {
+                        let date = chrono::NaiveDate::parse_from_str(&date, "%F").ok()?;
+                        let time = time_entry.started.time();
+                        time_entry.started = Local.from_local_date(&date).and_time(time).single()?;
+                    }
+                    TimeEntryChange::StartedTime(time) => {
+                        let time = chrono::NaiveTime::parse_from_str(&time, "%X").ok()?;
+                        let date = time_entry.started.naive_local().date();
+                        time_entry.started = Local.from_local_date(&date).and_time(time).single()?;
+                    }
+                    TimeEntryChange::Duration(mut duration) => {
+                        let negative = duration.chars().next()? == '-';
+                        if negative {
+                            duration.remove(0);
+                        }
+                        let mut duration_parts = duration.split(':');
+                        let hours: i64 = duration_parts.next()?.parse().ok()?;
+                        let minutes: i64 = duration_parts.next()?.parse().ok()?;
+                        let seconds: i64 = duration_parts.next()?.parse().ok()?;
+
+                        let mut total_seconds = hours * 3600 + minutes * 60 + seconds;
+                        if negative {
+                            total_seconds = -total_seconds;
+                        }
+                        let duration = chrono::Duration::seconds(total_seconds);
+                        time_entry.stopped = Some(time_entry.started + duration);
+                    }
+                    TimeEntryChange::StoppedDate(date) => {
+                        let date = chrono::NaiveDate::parse_from_str(&date, "%F").ok()?;
+                        let time = time_entry.stopped?.time();
+                        time_entry.stopped = Some(Local.from_local_date(&date).and_time(time).single()?);
+                    }
+                    TimeEntryChange::StoppedTime(time) => {
+                        let time = chrono::NaiveTime::parse_from_str(&time, "%X").ok()?;
+                        let date = time_entry.stopped?.naive_local().date();
+                        time_entry.stopped = Some(Local.from_local_date(&date).and_time(time).single()?);
+                    }
+                }
+                // @TODO: Send request.
+                Some(())
             };
-            log!("Msg::SaveTimeEntryChange", client_id, project_id, time_entry_id);
-            delete_time_entry_change();
+            save_time_entry_change();
         },
 
         Msg::OnSecondTick => (),
@@ -542,6 +633,9 @@ fn view_duration(
     for_active_time_entry: bool
 ) -> Node<Msg> {
     let num_seconds = duration.num_seconds();
+
+    let negative = num_seconds < 0;
+    let num_seconds = num_seconds.abs();
     let hours = num_seconds / 3600;
     let minutes = num_seconds % 3600 / 60;
     let seconds = num_seconds % 60;
@@ -563,7 +657,7 @@ fn view_duration(
             At::Value => if let Some(TimeEntryChange::Duration(duration)) = time_entry_change {
                 duration.to_owned()
             } else {
-                format!("{}:{:02}:{:02}", hours, minutes, seconds)
+                format!("{}{}:{:02}:{:02}", if negative { "-" } else { "" }, hours, minutes, seconds)
             }
         },
         input_ev(Ev::Input, move |duration| Msg::TimeEntryDurationChanged(client_id, project_id, time_entry_id, duration)),
