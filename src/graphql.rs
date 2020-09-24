@@ -27,6 +27,29 @@ pub async fn send_query<'a, ResponseData: 'a, Root: cynic::QueryRoot>(
     Ok(response_data.data.expect("response data"))
 }
 
+pub async fn send_mutation<'a, ResponseData: 'a, Root: cynic::MutationRoot>(
+    selection_set: cynic::SelectionSet<'a, ResponseData, Root>
+) -> Result<ResponseData> {
+    let mutation = cynic::Operation::mutation(selection_set);
+
+    let graphql_response = 
+        // @TODO: Move url to a config file.
+        Request::new("https://time-tracker.eu-central-1.aws.cloud.dgraph.io/graphql")
+            .method(Method::Post)
+            .json(&mutation)?
+            .fetch()
+            .await?
+            .check_status()?
+            .json()
+            .await?;
+
+    let response_data = mutation.decode_response(graphql_response)?;
+    if let Some(errors) = response_data.errors {
+        Err(errors)?
+    }
+    Ok(response_data.data.expect("response data"))
+}
+
 // ------ Error ------
 
 #[derive(Debug)]
@@ -57,6 +80,99 @@ impl From<cynic::DecodeError> for GraphQLError {
 // ------ ------
 // GraphQL items
 // ------ ------
+
+pub mod mutations {
+    #[cynic::query_module(
+        schema_path = "schema.graphql",
+        query_module = "query_dsl",
+    )]
+    pub mod rename_client {
+        use crate::graphql::query_dsl;
+
+        ///```graphql
+        /// mutation {
+        ///     updateClient(input: {
+        ///       filter: {id: {eq: "[client id]"}}
+        ///       set: {name: "New Client Name"}
+        ///     }) {
+        ///       numUids
+        ///     }
+        ///   }
+        ///```
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(
+            graphql_type = "Mutation",
+            argument_struct = "RenameClientArguments",
+        )]
+        pub struct Mutation {
+            #[arguments(input = UpdateClientInput {
+                filter: ClientFilter {
+                    id: StringHashFilter {
+                        eq: Some(args.id),
+                    }
+                },
+                set: Some(ClientPatch {
+                    name: Some(args.name),
+                    projects: None,
+                    time_blocks: None,
+                    user: None,
+                }),
+                remove: None, 
+            })]
+            pub update_client: Option<UpdateClientPayload>,
+        }
+
+        #[derive(cynic::FragmentArguments, Clone, Debug)]
+        pub struct RenameClientArguments {
+            pub id: String,
+            pub name: String,
+        }
+
+        #[derive(cynic::InputObject, Clone, Debug)]
+        #[cynic(graphql_type = "UpdateClientInput")]
+        pub struct UpdateClientInput {
+            pub filter: ClientFilter,
+            pub set: Option<ClientPatch>,
+            pub remove: Option<ClientPatch>,
+        }
+
+        // @TODO Cannot make recursive structs 
+        // because `cynic` doesn't support wrappers like `Rc` and `Box`.
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ClientFilter")]
+        pub struct ClientFilter {
+            pub id: Option<StringHashFilter>,
+            pub and: Option<Box<ClientFilter>>,
+            pub or: Option<Box<ClientFilter>>,
+            pub not: Option<Box<ClientFilter>>,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "StringHashFilter")]
+        pub struct StringHashFilter {
+            pub eq: Option<String>,
+        }
+
+        // @TODO: Can't derive `Debug`. `*Ref` types should implement `Debug`.
+        // @TODO Is `Clone` for `InputObject` necessary? If so, `**Ref` types should implement `Clone`.
+        // @TODO Should `*Ref` types implement `cynic::Scalar` to compile the code below?
+        // @TODO How to correctly create and use `*Ref` types`?
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ClientPatch")]
+        pub struct ClientPatch {
+            pub name: Option<String>,
+            pub projects: Option<Vec<query_dsl::ProjectRef>>,
+            pub time_blocks: Option<Vec<query_dsl::TimeBlockRef>>,
+            pub user: Option<String>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "UpdateClientPayload")]
+        pub struct UpdateClientPayload {
+            pub num_uids: Option<i32>,
+        }
+    }
+}
 
 pub mod queries {
     #[cynic::query_module(
