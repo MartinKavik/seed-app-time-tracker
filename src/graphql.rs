@@ -106,11 +106,11 @@ pub mod mutations {
         )]
         pub struct Mutation {
             #[arguments(input = UpdateClientInput {
-                filter: ClientFilter {
-                    id: StringHashFilter {
-                        eq: Some(args.id),
-                    }
-                },
+                // filter: ClientFilter {
+                //     id: Some(StringHashFilter {
+                //         eq: Some(args.id),
+                //     })
+                // },
                 set: Some(ClientPatch {
                     name: Some(args.name),
                     projects: None,
@@ -122,30 +122,30 @@ pub mod mutations {
             pub update_client: Option<UpdateClientPayload>,
         }
 
-        #[derive(cynic::FragmentArguments, Clone, Debug)]
+        #[derive(cynic::FragmentArguments, Debug)]
         pub struct RenameClientArguments {
             pub id: String,
             pub name: String,
         }
 
-        #[derive(cynic::InputObject, Clone, Debug)]
+        #[derive(cynic::InputObject, Debug)]
         #[cynic(graphql_type = "UpdateClientInput")]
         pub struct UpdateClientInput {
-            pub filter: ClientFilter,
+            // pub filter: ClientFilter,
             pub set: Option<ClientPatch>,
             pub remove: Option<ClientPatch>,
         }
 
-        // @TODO Cannot make recursive structs 
+        // @TODO Cannot make recursive structs yet
         // because `cynic` doesn't support wrappers like `Rc` and `Box`.
-        #[derive(cynic::InputObject, Debug)]
-        #[cynic(graphql_type = "ClientFilter")]
-        pub struct ClientFilter {
-            pub id: Option<StringHashFilter>,
-            pub and: Option<Box<ClientFilter>>,
-            pub or: Option<Box<ClientFilter>>,
-            pub not: Option<Box<ClientFilter>>,
-        }
+        // #[derive(cynic::InputObject, Debug)]
+        // #[cynic(graphql_type = "ClientFilter")]
+        // pub struct ClientFilter {
+        //     pub id: Option<StringHashFilter>,
+        //     pub and: Option<Box<ClientFilter>>,
+        //     pub or: Option<Box<ClientFilter>>,
+        //     pub not: Option<Box<ClientFilter>>,
+        // }
 
         #[derive(cynic::InputObject, Debug)]
         #[cynic(graphql_type = "StringHashFilter")]
@@ -153,18 +153,24 @@ pub mod mutations {
             pub eq: Option<String>,
         }
 
-        // @TODO: Can't derive `Debug`. `*Ref` types should implement `Debug`.
-        // @TODO Is `Clone` for `InputObject` necessary? If so, `**Ref` types should implement `Clone`.
-        // @TODO Should `*Ref` types implement `cynic::Scalar` to compile the code below?
-        // @TODO How to correctly create and use `*Ref` types`?
         #[derive(cynic::InputObject, Debug)]
         #[cynic(graphql_type = "ClientPatch")]
         pub struct ClientPatch {
             pub name: Option<String>,
-            pub projects: Option<Vec<query_dsl::ProjectRef>>,
-            pub time_blocks: Option<Vec<query_dsl::TimeBlockRef>>,
+            pub projects: Option<Vec<Project>>,
+            pub time_blocks: Option<Vec<TimeBlock>>,
             pub user: Option<String>,
         }
+
+        // @TODO why Scalar, how to use `*Ref`?
+        #[derive(cynic::Scalar, Debug)]
+        pub struct Project(pub String); 
+        impl cynic::InputObject<query_dsl::ProjectRef> for Project {}
+
+        // @TODO why Scalar, how to use `*Ref`?
+        #[derive(cynic::Scalar, Debug)]
+        pub struct TimeBlock(pub String);
+        impl cynic::InputObject<query_dsl::TimeBlockRef> for TimeBlock {}
 
         #[derive(cynic::QueryFragment, Debug)]
         #[cynic(graphql_type = "UpdateClientPayload")]
