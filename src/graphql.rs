@@ -87,7 +87,7 @@ pub mod mutations {
         query_module = "query_dsl",
     )]
     pub mod rename_client {
-        use crate::graphql::query_dsl;
+        use crate::graphql::{query_dsl, types::*};
 
         ///```graphql
         /// mutation {
@@ -106,11 +106,14 @@ pub mod mutations {
         )]
         pub struct Mutation {
             #[arguments(input = UpdateClientInput {
-                // filter: ClientFilter {
-                //     id: Some(StringHashFilter {
-                //         eq: Some(args.id),
-                //     })
-                // },
+                filter: ClientFilter {
+                    id: Some(StringHashFilter {
+                        eq: Some(args.id),
+                    }),
+                    and: None,
+                    not: None,
+                    or: None,
+                },
                 set: Some(ClientPatch {
                     name: Some(args.name),
                     projects: None,
@@ -131,21 +134,19 @@ pub mod mutations {
         #[derive(cynic::InputObject, Debug)]
         #[cynic(graphql_type = "UpdateClientInput")]
         pub struct UpdateClientInput {
-            // pub filter: ClientFilter,
+            pub filter: ClientFilter,
             pub set: Option<ClientPatch>,
             pub remove: Option<ClientPatch>,
         }
 
-        // @TODO Cannot make recursive structs yet
-        // because `cynic` doesn't support wrappers like `Rc` and `Box`.
-        // #[derive(cynic::InputObject, Debug)]
-        // #[cynic(graphql_type = "ClientFilter")]
-        // pub struct ClientFilter {
-        //     pub id: Option<StringHashFilter>,
-        //     pub and: Option<Box<ClientFilter>>,
-        //     pub or: Option<Box<ClientFilter>>,
-        //     pub not: Option<Box<ClientFilter>>,
-        // }
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ClientFilter")]
+        pub struct ClientFilter {
+            pub id: Option<StringHashFilter>,
+            pub and: Option<Box<ClientFilter>>,
+            pub or: Option<Box<ClientFilter>>,
+            pub not: Option<Box<ClientFilter>>,
+        }
 
         #[derive(cynic::InputObject, Debug)]
         #[cynic(graphql_type = "StringHashFilter")]
@@ -157,20 +158,68 @@ pub mod mutations {
         #[cynic(graphql_type = "ClientPatch")]
         pub struct ClientPatch {
             pub name: Option<String>,
-            pub projects: Option<Vec<Project>>,
-            pub time_blocks: Option<Vec<TimeBlock>>,
+            pub projects: Option<Vec<ProjectRef>>,
+            pub time_blocks: Option<Vec<TimeBlockRef>>,
             pub user: Option<String>,
         }
 
-        // @TODO why Scalar, how to use `*Ref`?
-        #[derive(cynic::Scalar, Debug)]
-        pub struct Project(pub String); 
-        impl cynic::InputObject<query_dsl::ProjectRef> for Project {}
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ProjectRef")]
+        pub struct ProjectRef {
+            pub id: Option<String>,
+            pub name: Option<String>,
+            pub time_entries: Option<Vec<TimeEntryRef>>,
+            pub client: Option<ClientRef>,
+        }
 
-        // @TODO why Scalar, how to use `*Ref`?
-        #[derive(cynic::Scalar, Debug)]
-        pub struct TimeBlock(pub String);
-        impl cynic::InputObject<query_dsl::TimeBlockRef> for TimeBlock {}
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "TimeEntryRef")]
+        pub struct TimeEntryRef {
+            pub id: Option<String>,
+            pub name: Option<String>,
+            pub started: Option<DateTime>,
+            pub stopped: Option<DateTime>,
+            pub project: Option<ProjectRef>,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ClientRef")]
+        pub struct ClientRef {
+            pub id: Option<String>,
+            pub name: Option<String>,
+            pub projects: Option<Vec<ProjectRef>>,
+            pub time_blocks: Option<Vec<TimeBlockRef>>,
+            pub user: Option<String>,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "TimeBlockRef")]
+        pub struct TimeBlockRef {
+            pub id: Option<String>,
+            pub name: Option<String>,
+            pub status: Option<TimeBlockStatus>,
+            pub duration: Option<i32>,
+            pub invoice: Option<Box<InvoiceRef>>,
+            pub client: Option<ClientRef>,
+        }
+
+        #[allow(non_camel_case_types)]
+        #[derive(cynic::Enum, Debug, Copy, Clone)]
+        #[cynic(graphql_type = "TimeBlockStatus")]
+        pub enum TimeBlockStatus {
+            NON_BILLABLE,
+            UNPAID,
+            PAID,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "InvoiceRef")]
+        pub struct InvoiceRef {
+            pub id: Option<String>,
+            pub custom_id: Option<String>,
+            pub url: Option<String>,
+            pub time_block: Option<TimeBlockRef>,
+        }
 
         #[derive(cynic::QueryFragment, Debug)]
         #[cynic(graphql_type = "UpdateClientPayload")]
@@ -374,7 +423,7 @@ mod types {
 }
 
 mod query_dsl {
-    use super::types::*;
+    pub use super::types::*;
     cynic::query_dsl!("schema.graphql");
 }
 
