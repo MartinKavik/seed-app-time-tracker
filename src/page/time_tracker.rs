@@ -63,7 +63,7 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
     );
 
     Ok(
-        graphql::send_query(query_mod::Query::fragment(()))
+        graphql::send_query(query_mod::Query::fragment(&()))
             .await?
             .query_client
             .expect("get clients")

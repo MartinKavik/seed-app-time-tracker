@@ -51,7 +51,7 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
     );
 
     Ok(
-        graphql::send_query(query_mod::Query::fragment(()))
+        graphql::send_query(query_mod::Query::fragment(&()))
             .await?
             .query_client
             .expect("get clients")
@@ -118,7 +118,7 @@ struct Project {
 
 pub enum Msg {
     ClientsFetched(graphql::Result<BTreeMap<ClientId, Client>>),
-    ChangesSaved(Option<FetchError>),
+    ChangesSaved(Option<graphql::GraphQLError>),
     ClearErrors,
     
     // ------ Client ------
@@ -213,8 +213,16 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             set_client_name(name);
         },
         Msg::SaveClientName(client_id) => {
-            // @TODO: Send request.
-        },
+            let args = graphql::mutations::rename_client::RenameClientArguments {
+                id: client_id.to_string(),
+                name: "asdf".to_owned(),
+            };
+            orders.perform_cmd(async move { Msg::ChangesSaved(
+                graphql::send_mutation(
+                    graphql::mutations::rename_client::Mutation::fragment(&args)
+                ).await.err()
+            )});
+        }
 
         // ------ Project ------
 
