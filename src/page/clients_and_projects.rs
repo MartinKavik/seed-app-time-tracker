@@ -213,15 +213,25 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             set_client_name(name);
         },
         Msg::SaveClientName(client_id) => {
-            let args = graphql::mutations::rename_client::RenameClientArguments {
-                id: client_id.to_string(),
-                name: "asdf".to_owned(),
+            let mut save_client_name = move |client_id| -> Option<()> {
+                let name = &model
+                    .clients
+                    .loaded_mut()?
+                    .get(&client_id)?
+                    .name;
+
+                let args = graphql::mutations::rename_client::RenameClientArguments {
+                    id: client_id.to_string(),
+                    name: name.clone(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::rename_client::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+                Some(())
             };
-            orders.perform_cmd(async move { Msg::ChangesSaved(
-                graphql::send_mutation(
-                    graphql::mutations::rename_client::Mutation::fragment(&args)
-                ).await.err()
-            )});
+            save_client_name(client_id);
         }
 
         // ------ Project ------

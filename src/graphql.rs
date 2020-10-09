@@ -110,17 +110,10 @@ pub mod mutations {
                     id: Some(StringHashFilter {
                         eq: Some(args.id.clone()),
                     }),
-                    and: None,
-                    not: None,
-                    or: None,
                 },
                 set: Some(ClientPatch {
                     name: Some(args.name.clone()),
-                    projects: None,
-                    time_blocks: None,
-                    user: None,
                 }),
-                remove: None,
             })]
             pub update_client: Option<UpdateClientPayload>,
         }
@@ -136,16 +129,12 @@ pub mod mutations {
         pub struct UpdateClientInput {
             pub filter: ClientFilter,
             pub set: Option<ClientPatch>,
-            pub remove: Option<ClientPatch>,
         }
 
         #[derive(cynic::InputObject, Debug)]
         #[cynic(graphql_type = "ClientFilter")]
         pub struct ClientFilter {
             pub id: Option<StringHashFilter>,
-            pub and: Option<Box<ClientFilter>>,
-            pub or: Option<Box<ClientFilter>>,
-            pub not: Option<Box<ClientFilter>>,
         }
 
         #[derive(cynic::InputObject, Debug)]
@@ -158,67 +147,6 @@ pub mod mutations {
         #[cynic(graphql_type = "ClientPatch")]
         pub struct ClientPatch {
             pub name: Option<String>,
-            pub projects: Option<Vec<ProjectRef>>,
-            pub time_blocks: Option<Vec<TimeBlockRef>>,
-            pub user: Option<String>,
-        }
-
-        #[derive(cynic::InputObject, Debug)]
-        #[cynic(graphql_type = "ProjectRef")]
-        pub struct ProjectRef {
-            pub id: Option<String>,
-            pub name: Option<String>,
-            pub time_entries: Option<Vec<TimeEntryRef>>,
-            pub client: Option<ClientRef>,
-        }
-
-        #[derive(cynic::InputObject, Debug)]
-        #[cynic(graphql_type = "TimeEntryRef")]
-        pub struct TimeEntryRef {
-            pub id: Option<String>,
-            pub name: Option<String>,
-            pub started: Option<DateTime>,
-            pub stopped: Option<DateTime>,
-            pub project: Option<ProjectRef>,
-        }
-
-        #[derive(cynic::InputObject, Debug)]
-        #[cynic(graphql_type = "ClientRef")]
-        pub struct ClientRef {
-            pub id: Option<String>,
-            pub name: Option<String>,
-            pub projects: Option<Vec<ProjectRef>>,
-            pub time_blocks: Option<Vec<TimeBlockRef>>,
-            pub user: Option<String>,
-        }
-
-        #[derive(cynic::InputObject, Debug)]
-        #[cynic(graphql_type = "TimeBlockRef")]
-        pub struct TimeBlockRef {
-            pub id: Option<String>,
-            pub name: Option<String>,
-            pub status: Option<TimeBlockStatus>,
-            pub duration: Option<i32>,
-            pub invoice: Option<Box<InvoiceRef>>,
-            pub client: Option<ClientRef>,
-        }
-
-        #[allow(non_camel_case_types)]
-        #[derive(cynic::Enum, Debug, Copy, Clone)]
-        #[cynic(graphql_type = "TimeBlockStatus")]
-        pub enum TimeBlockStatus {
-            NON_BILLABLE,
-            UNPAID,
-            PAID,
-        }
-
-        #[derive(cynic::InputObject, Debug)]
-        #[cynic(graphql_type = "InvoiceRef")]
-        pub struct InvoiceRef {
-            pub id: Option<String>,
-            pub custom_id: Option<String>,
-            pub url: Option<String>,
-            pub time_block: Option<TimeBlockRef>,
         }
 
         #[derive(cynic::QueryFragment, Debug)]
