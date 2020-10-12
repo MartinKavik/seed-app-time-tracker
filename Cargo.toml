@@ -24,9 +24,7 @@ ulid = "0.4.0"
 serde = "1.0.115"
 wasm-bindgen-futures = "0.4.17"
 serde-wasm-bindgen = "0.1.3"
-# cynic = "0.9.0"
-# cynic = { path = "../cynic/cynic" }
-cynic = { git = "https://github.com/obmarg/cynic" }
+cynic = "0.10.0"
 
 [profile.release]
 lto = true
