@@ -176,13 +176,12 @@ pub mod mutations {
             client: Option<ClientRef>,
         }
 
-        #[allow(non_camel_case_types)]
         #[derive(cynic::Enum, Debug, Copy, Clone)]
-        #[cynic(graphql_type = "TimeBlockStatus")]
+        #[cynic(graphql_type = "TimeBlockStatus", rename_all = "SCREAMING_SNAKE_CASE")]
         pub enum TimeBlockStatus {
-            NON_BILLABLE,
-            UNPAID,
-            PAID,
+            NonBillable,
+            Unpaid,
+            Paid,
         }
 
         #[derive(cynic::InputObject, Debug)]
@@ -486,13 +485,12 @@ pub mod queries {
             pub invoice: Option<Invoice>,
         }
 
-        #[allow(non_camel_case_types)]
         #[derive(cynic::Enum, Debug, Copy, Clone)]
-        #[cynic(graphql_type = "TimeBlockStatus")]
+        #[cynic(graphql_type = "TimeBlockStatus", rename_all = "SCREAMING_SNAKE_CASE")]
         pub enum TimeBlockStatus {
-            NON_BILLABLE,
-            UNPAID,
-            PAID,
+            NonBillable,
+            Unpaid,
+            Paid,
         }
 
         #[derive(cynic::QueryFragment, Debug)]

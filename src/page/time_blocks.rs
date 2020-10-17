@@ -43,9 +43,9 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
 
     let status_mapper = |status: query_mod::TimeBlockStatus| {
         match status {
-            query_mod::TimeBlockStatus::NON_BILLABLE => TimeBlockStatus::NonBillable,
-            query_mod::TimeBlockStatus::UNPAID => TimeBlockStatus::Unpaid,
-            query_mod::TimeBlockStatus::PAID => TimeBlockStatus::Paid,
+            query_mod::TimeBlockStatus::NonBillable => TimeBlockStatus::NonBillable,
+            query_mod::TimeBlockStatus::Unpaid => TimeBlockStatus::Unpaid,
+            query_mod::TimeBlockStatus::Paid => TimeBlockStatus::Paid,
         }
     };
 
