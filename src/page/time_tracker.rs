@@ -101,6 +101,14 @@ enum RemoteData<T> {
 }
 
 impl<T> RemoteData<T> {
+    fn loaded(&self) -> Option<&T> {
+        if let Self::Loaded(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
     fn loaded_mut(&mut self) -> Option<&mut T> {
         if let Self::Loaded(data) = self {
             Some(data)
@@ -147,7 +155,7 @@ enum TimeEntryChange {
 
 pub enum Msg {
     ClientsFetched(graphql::Result<BTreeMap<ClientId, Client>>),
-    ChangesSaved(Option<FetchError>),
+    ChangesSaved(Option<graphql::GraphQLError>),
     ClearErrors,
     
     Start(ClientId, ProjectId),
@@ -171,7 +179,7 @@ pub enum Msg {
     OnSecondTick,
 }
 
-pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
+pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::ClientsFetched(Ok(clients)) => {
             model.clients = RemoteData::Loaded(clients);
@@ -183,8 +191,8 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
         Msg::ChangesSaved(None) => {
             log!("Msg::ChangesSaved");
         },
-        Msg::ChangesSaved(Some(fetch_error)) => {
-            log!("Msg::ChangesSaved", fetch_error);
+        Msg::ChangesSaved(Some(graphql_error)) => {
+            log!("Msg::ChangesSaved", graphql_error);
         },
 
         Msg::ClearErrors => {
@@ -213,7 +221,19 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     stopped: None,
                     change: None,
                 };
-                // @TODO: Send request.
+                
+                let args = graphql::mutations::time_entry::add::AddTimeEntryArguments {
+                    id: time_entry_id.to_string(),
+                    name: time_entry.name.clone(),
+                    started: time_entry.started.clone(),
+                    project: project_id.to_string(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::time_entry::add::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+
                 time_entries.insert(time_entry_id, time_entry);
 
                 Some(())
@@ -233,7 +253,18 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                     .find(|(_, time_entry)| time_entry.stopped.is_none())?;
                 
                 time_entry.stopped = Some(chrono::Local::now());
-                // @TODO: Send request.
+
+                let args = graphql::mutations::time_entry::set_times::SetTimeEntryTimesArguments {
+                    id: time_entry_id.to_string(),
+                    started: time_entry.started.clone(),
+                    stopped: time_entry.stopped.clone(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::time_entry::set_times::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+
                 Some(())
             };
             stop_time_entry(client_id, project_id);
@@ -253,7 +284,15 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
 
                 if let Ok(true) = window().confirm_with_message(&format!("Time Entry \"{}\" will be deleted.", time_entry_name)) {
                     time_entries.remove(&time_entry_id);
-                    // @TODO: Send request.
+
+                    let args = graphql::mutations::time_entry::delete::DeleteTimeEntryArguments {
+                        id: time_entry_id.to_string(),
+                    };
+                    orders.perform_cmd(async move { Msg::ChangesSaved(
+                        graphql::send_mutation(
+                            graphql::mutations::time_entry::delete::Mutation::fragment(&args)
+                        ).await.err()
+                    )});
                 }
                 Some(())
             };
@@ -275,7 +314,29 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
             set_time_entry_name(name);
         },
         Msg::SaveTimeEntryName(client_id, project_id, time_entry_id) => {
-            // @TODO: Send request.
+            let mut save_time_entry_name = move |time_entry_id| -> Option<()> {
+                let name = &model
+                    .clients
+                    .loaded()?
+                    .get(&client_id)?
+                    .projects
+                    .get(&project_id)?
+                    .time_entries
+                    .get(&time_entry_id)?
+                    .name;
+
+                let args = graphql::mutations::time_entry::rename::RenameTimeEntryArguments {
+                    id: time_entry_id.to_string(),
+                    name: name.clone(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::time_entry::rename::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+                Some(())
+            };
+            save_time_entry_name(time_entry_id);
         },
 
         Msg::TimeEntryStartedDateChanged(client_id, project_id, time_entry_id, date) => {
@@ -401,7 +462,16 @@ pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
                         time_entry.stopped = Some(Local.from_local_date(&date).and_time(time).single()?);
                     }
                 }
-                // @TODO: Send request.
+                let args = graphql::mutations::time_entry::set_times::SetTimeEntryTimesArguments {
+                    id: time_entry_id.to_string(),
+                    started: time_entry.started.clone(),
+                    stopped: time_entry.stopped.clone(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::time_entry::set_times::Mutation::fragment(&args)
+                    ).await.err()
+                )});
                 Some(())
             };
             save_time_entry_change();

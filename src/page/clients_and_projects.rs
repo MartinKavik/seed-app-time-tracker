@@ -160,8 +160,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::ChangesSaved(None) => {
             log!("Msg::ChangesSaved");
         },
-        Msg::ChangesSaved(Some(fetch_error)) => {
-            log!("Msg::ChangesSaved", fetch_error);
+        Msg::ChangesSaved(Some(graphql_error)) => {
+            log!("Msg::ChangesSaved", graphql_error);
         },
 
         Msg::ClearErrors => {

@@ -12,7 +12,7 @@ pub mod add {
     ///       name: "",
     ///       projects: [],
     ///       time_blocks: [],
-    ///       user: "[user_id]",
+    ///       user: "[user id]",
     ///     }) {
     ///       numUids
     ///     }

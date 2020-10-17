@@ -8,10 +8,10 @@ pub mod add {
     ///```graphql
     /// mutation {
     ///     addProject(input: {
-    ///       id: "[client id]",
+    ///       id: "[project id]",
     ///       name: "",
     ///       time_entries: [],
-    ///       client: ClientRef,
+    ///       client: { id: "[client id]" },
     ///     }) {
     ///       numUids
     ///     }
@@ -77,7 +77,7 @@ pub mod rename {
 
     ///```graphql
     /// mutation {
-    ///     renameProject(input: {
+    ///     updateProject(input: {
     ///       filter: {id: {eq: "[project id]"}}
     ///       set: {name: "New Project Name"}
     ///     }) {
