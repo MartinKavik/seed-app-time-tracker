@@ -127,6 +127,14 @@ enum RemoteData<T> {
 }
 
 impl<T> RemoteData<T> {
+    fn loaded(&mut self) -> Option<&T> {
+        if let Self::Loaded(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
     fn loaded_mut(&mut self) -> Option<&mut T> {
         if let Self::Loaded(data) = self {
             Some(data)
