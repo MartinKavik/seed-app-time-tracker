@@ -86,6 +86,125 @@ pub mod mutations {
         schema_path = "schema.graphql",
         query_module = "query_dsl",
     )]
+    pub mod add_client {
+        use crate::graphql::{query_dsl, types::*};
+
+        ///```graphql
+        /// mutation {
+        ///     addClient(input: {
+        ///       id: "[client id]",
+        ///       name: "",
+        ///       projects: [],
+        ///       time_blocks: [],
+        ///       user: "[user_id]",
+        ///     }) {
+        ///       numUids
+        ///     }
+        ///   }
+        ///```
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(
+            graphql_type = "Mutation",
+            argument_struct = "AddClientArguments",
+        )]
+        pub struct Mutation {
+            #[arguments(input = vec![
+                AddClientInput {
+                    id: args.id.clone(),
+                    name: String::new(),
+                    projects: Vec::new(),
+                    time_blocks: Vec::new(),
+                    user: args.user.clone(),
+                }
+            ])]
+            pub add_client: Option<AddClientPayload>,
+        }
+
+        #[derive(cynic::FragmentArguments, Debug)]
+        pub struct AddClientArguments {
+            pub id: String,
+            pub user: String,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "AddClientInput")]
+        pub struct AddClientInput {
+            id: String,
+            name: String,
+            projects: Vec<ProjectRef>,
+            time_blocks: Vec<TimeBlockRef>,
+            user: String,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ProjectRef")]
+        pub struct ProjectRef {
+            id: Option<String>,
+            name: Option<String>,
+            time_entries: Option<Vec<TimeEntryRef>>,
+            client: Option<ClientRef>,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "TimeEntryRef")]
+        pub struct TimeEntryRef {
+            id: Option<String>,
+            name: Option<String>,
+            started:Option<DateTime>,
+            stopped: Option<DateTime>,
+            project: Option<ProjectRef>,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ClientRef")]
+        pub struct ClientRef {
+            id: Option<String>,
+            name: Option<String>,
+            projects: Option<Vec<ProjectRef>>,
+            time_blocks: Option<Vec<TimeBlockRef>>,
+            user: Option<String>,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "TimeBlockRef")]
+        pub struct TimeBlockRef {
+            id: Option<String>,
+            name: Option<String>,
+            status: Option<TimeBlockStatus>,
+            duration: Option<i32>,
+            invoice: Option<InvoiceRef>,
+            client: Option<ClientRef>,
+        }
+
+        #[allow(non_camel_case_types)]
+        #[derive(cynic::Enum, Debug, Copy, Clone)]
+        #[cynic(graphql_type = "TimeBlockStatus")]
+        pub enum TimeBlockStatus {
+            NON_BILLABLE,
+            UNPAID,
+            PAID,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "InvoiceRef")]
+        pub struct InvoiceRef {
+            id: Option<String>,
+            custom_id: Option<String>,
+            url: Option<String>,
+            time_block: Option<Box<TimeBlockRef>>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "AddClientPayload")]
+        pub struct AddClientPayload {
+            pub num_uids: Option<i32>,
+        }
+    }
+
+    #[cynic::query_module(
+        schema_path = "schema.graphql",
+        query_module = "query_dsl",
+    )]
     pub mod rename_client {
         use crate::graphql::{query_dsl, types::*};
 

@@ -170,7 +170,17 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     projects: BTreeMap::new(),
                     name_input: ElRef::new(),
                 };
-                // @TODO: Send request.
+
+                let args = graphql::mutations::add_client::AddClientArguments {
+                    id: client_id.to_string(),
+                    user: "DUMMY_USER_ID".to_owned(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::add_client::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+
                 clients.insert(client_id, client);
                 orders.after_next_render(move |_| Msg::FocusClientName(client_id));
             }
