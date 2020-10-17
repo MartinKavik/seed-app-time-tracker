@@ -192,7 +192,15 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 
                 if let Ok(true) = window().confirm_with_message(&format!("Client \"{}\" will be deleted.", client_name)) {
                     clients.remove(&client_id);
-                    // @TODO: Send request.
+                    
+                    let args = graphql::mutations::delete_client::DeleteClientArguments {
+                        id: client_id.to_string(),
+                    };
+                    orders.perform_cmd(async move { Msg::ChangesSaved(
+                        graphql::send_mutation(
+                            graphql::mutations::delete_client::Mutation::fragment(&args)
+                        ).await.err()
+                    )});
                 }
                 Some(())
             };

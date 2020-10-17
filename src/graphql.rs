@@ -274,6 +274,60 @@ pub mod mutations {
             pub num_uids: Option<i32>,
         }
     }
+
+    #[cynic::query_module(
+        schema_path = "schema.graphql",
+        query_module = "query_dsl",
+    )]
+    pub mod delete_client {
+        use crate::graphql::{query_dsl, types::*};
+
+        ///```graphql
+        /// mutation {
+        ///     deleteClient(input: {
+        ///       filter: {id: {eq: "[client id]"}}
+        ///     }) {
+        ///       numUids
+        ///     }
+        ///   }
+        ///```
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(
+            graphql_type = "Mutation",
+            argument_struct = "DeleteClientArguments",
+        )]
+        pub struct Mutation {
+            #[arguments(filter = ClientFilter {
+                id: Some(StringHashFilter {
+                    eq: Some(args.id.clone()),
+                })
+            })]
+            pub delete_client: Option<DeleteClientPayload>,
+        }
+
+        #[derive(cynic::FragmentArguments, Debug)]
+        pub struct DeleteClientArguments {
+            pub id: String,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "ClientFilter")]
+        pub struct ClientFilter {
+            pub id: Option<StringHashFilter>,
+        }
+
+        #[derive(cynic::InputObject, Debug)]
+        #[cynic(graphql_type = "StringHashFilter")]
+        pub struct StringHashFilter {
+            pub eq: Option<String>,
+        }
+
+        #[derive(cynic::QueryFragment, Debug)]
+        #[cynic(graphql_type = "DeleteClientPayload")]
+        pub struct DeleteClientPayload {
+            pub num_uids: Option<i32>,
+        }
+    }
 }
 
 pub mod queries {
