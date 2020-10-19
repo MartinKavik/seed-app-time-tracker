@@ -14,6 +14,7 @@ use crate::graphql;
 const PRIMARY_COLOR: &str = "#00d1b2";
 
 type ClientId = Ulid;
+type InvoiceId = Ulid;
 type TimeBlockId = Ulid;
 
 // ------ ------
@@ -36,6 +37,7 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
 
     let invoice_mapper = |invoice: query_mod::Invoice| {
         Invoice {
+            id: invoice.id.parse().expect("parse invoice Ulid"),
             custom_id: invoice.custom_id,
             url: invoice.url,
         }
@@ -149,7 +151,7 @@ impl<T> RemoteData<T> {
 #[derive(Debug)]
 pub struct Client {
     name: String,
-    time_blocks: BTreeMap<Ulid, TimeBlock>,
+    time_blocks: BTreeMap<TimeBlockId, TimeBlock>,
     tracked: Duration,
 }
 
@@ -172,6 +174,7 @@ pub enum TimeBlockStatus {
 
 #[derive(Debug)]
 struct Invoice {
+    id: InvoiceId,
     custom_id: Option<String>,
     url: Option<String>,
 }
@@ -182,7 +185,7 @@ struct Invoice {
 
 pub enum Msg {
     ClientsFetched(graphql::Result<BTreeMap<ClientId, Client>>),
-    ChangesSaved(Option<FetchError>),
+    ChangesSaved(Option<graphql::GraphQLError>),
     ClearErrors,
 
     // ------ TimeBlock ------
@@ -250,7 +253,18 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     invoice: None,
                     name_input: ElRef::new(),
                 };
-                // @TODO: Send request.
+                
+                let args = graphql::mutations::time_block::add::AddTimeBlockArguments {
+                    id: time_block_id.to_string(),
+                    duration: time_block.duration,
+                    client: client_id.to_string(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::time_block::add::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+
                 time_blocks.insert(time_block_id, time_block);
                 orders.after_next_render(move |_| Msg::FocusTimeBlockName(client_id, time_block_id));
 
@@ -265,7 +279,15 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 
                 if let Ok(true) = window().confirm_with_message(&format!("Time Block \"{}\" will be deleted.", time_block_name)) {
                     time_blocks.remove(&time_block_id);
-                    // @TODO: Send request.
+                    
+                    let args = graphql::mutations::time_block::delete::DeleteTimeBlockArguments {
+                        id: time_block_id.to_string(),
+                    };
+                    orders.perform_cmd(async move { Msg::ChangesSaved(
+                        graphql::send_mutation(
+                            graphql::mutations::time_block::delete::Mutation::fragment(&args)
+                        ).await.err()
+                    )});
                 }
                 Some(())
             };
@@ -280,7 +302,27 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     .time_blocks
                     .get_mut(&time_block_id)?
                     .status = status;
-                // @TODO: Send request.
+
+                    let args = graphql::mutations::time_block::set_status::SetTimeBlockStatusArguments {
+                        id: time_block_id.to_string(),
+                        status: match status {
+                            TimeBlockStatus::NonBillable => {
+                                graphql::mutations::time_block::set_status::TimeBlockStatus::NonBillable
+                            }
+                            TimeBlockStatus::Unpaid => {
+                                graphql::mutations::time_block::set_status::TimeBlockStatus::Unpaid
+                            }
+                            TimeBlockStatus::Paid => {
+                                graphql::mutations::time_block::set_status::TimeBlockStatus::Paid
+                            }
+                        }
+                    };
+                    orders.perform_cmd(async move { Msg::ChangesSaved(
+                        graphql::send_mutation(
+                            graphql::mutations::time_block::set_status::Mutation::fragment(&args)
+                        ).await.err()
+                    )});
+                    
                 Some(())
             };
             set_time_block_status(time_block_status);
@@ -314,7 +356,27 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             set_time_block_name(name);
         },
         Msg::SaveTimeBlockName(client_id, time_block_id) => {
-            // @TODO: Send request.
+            let mut save_time_block_name = move |time_block_id| -> Option<()> {
+                let name = &model
+                    .clients
+                    .loaded()?
+                    .get(&client_id)?
+                    .time_blocks
+                    .get(&time_block_id)?
+                    .name;
+
+                let args = graphql::mutations::time_block::rename::RenameTimeBlockArguments {
+                    id: time_block_id.to_string(),
+                    name: name.clone(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::time_block::rename::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+                Some(())
+            };
+            save_time_block_name(time_block_id);
         },
 
         Msg::TimeBlockDurationChanged(client_id, time_block_id, duration) => {
@@ -340,7 +402,17 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 
                 let hours = time_block.duration_change.take()?.parse::<f64>().ok()?;
                 time_block.duration = chrono::Duration::seconds((hours * 3600.0) as i64);
-                // @TODO: Send request.
+                
+                let args = graphql::mutations::time_block::set_duration::SetTimeBlockDurationArguments {
+                    id: time_block_id.to_string(),
+                    duration: time_block.duration.num_seconds() as i32,
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::time_block::set_duration::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+
                 Some(())
             };
             set_time_block_duration();
@@ -357,11 +429,23 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     .time_blocks
                     .get_mut(&time_block_id)?;
 
+                let invoice_id = InvoiceId::new();
                 let invoice = Invoice {
+                    id: invoice_id,
                     custom_id: Some("".to_owned()),
                     url: Some("".to_owned()),
                 };
-                // @TODO: Send request.
+                
+                let args = graphql::mutations::invoice::add::AddInvoiceArguments {
+                    id: invoice_id.to_string(),
+                    time_block: time_block_id.to_string(),
+                };
+                orders.perform_cmd(async move { Msg::ChangesSaved(
+                    graphql::send_mutation(
+                        graphql::mutations::invoice::add::Mutation::fragment(&args)
+                    ).await.err()
+                )});
+
                 time_block.invoice = Some(invoice);
                 Some(())
             };
@@ -377,8 +461,16 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     .get_mut(&time_block_id)?;
 
                 if let Ok(true) = window().confirm_with_message(&format!("Invoice attached to Time Block \"{}\" will be deleted.", time_block.name)) {
-                    time_block.invoice = None;
-                    // @TODO: Send request.
+                    if let Some(invoice) = time_block.invoice.take() {
+                        let args = graphql::mutations::invoice::delete::DeleteInvoiceArguments {
+                            id: invoice.id.to_string(),
+                        };
+                        orders.perform_cmd(async move { Msg::ChangesSaved(
+                            graphql::send_mutation(
+                                graphql::mutations::invoice::delete::Mutation::fragment(&args)
+                            ).await.err()
+                        )});
+                    }
                 }
                 Some(())
             };
@@ -399,7 +491,30 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             set_invoice_custom_id(client_id, time_block_id, custom_id);
         },
         Msg::SaveInvoiceCustomId(client_id, time_block_id) => {
-            // @TODO: Send request.
+            let mut save_invoice_custom_id = move |time_block_id| -> Option<()> {
+                let invoice = model
+                    .clients
+                    .loaded()?
+                    .get(&client_id)?
+                    .time_blocks
+                    .get(&time_block_id)?
+                    .invoice
+                    .as_ref()?;
+
+                if let Some(custom_id) = &invoice.custom_id {
+                    let args = graphql::mutations::invoice::set_custom_id::SetInvoiceCustomIdArguments {
+                        id: invoice.id.to_string(),
+                        custom_id: custom_id.clone(),
+                    };
+                    orders.perform_cmd(async move { Msg::ChangesSaved(
+                        graphql::send_mutation(
+                            graphql::mutations::invoice::set_custom_id::Mutation::fragment(&args)
+                        ).await.err()
+                    )});
+                }
+                Some(())
+            };
+            save_invoice_custom_id(time_block_id);
         },
 
         Msg::InvoiceUrlChanged(client_id, time_block_id, url) => {
@@ -416,7 +531,30 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             set_invoice_url(client_id, time_block_id, url);
         },
         Msg::SaveInvoiceUrl(client_id, time_block_id) => {
-            // @TODO: Send request.
+            let mut save_invoice_url = move |time_block_id| -> Option<()> {
+                let invoice = model
+                    .clients
+                    .loaded()?
+                    .get(&client_id)?
+                    .time_blocks
+                    .get(&time_block_id)?
+                    .invoice
+                    .as_ref()?;
+
+                if let Some(url) = &invoice.url {
+                    let args = graphql::mutations::invoice::set_url::SetInvoiceUrlArguments {
+                        id: invoice.id.to_string(),
+                        url: url.clone(),
+                    };
+                    orders.perform_cmd(async move { Msg::ChangesSaved(
+                        graphql::send_mutation(
+                            graphql::mutations::invoice::set_url::Mutation::fragment(&args)
+                        ).await.err()
+                    )});
+                }
+                Some(())
+            };
+            save_invoice_url(time_block_id);
         },
     }
 }

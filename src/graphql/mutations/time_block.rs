@@ -204,4 +204,158 @@ pub mod delete {
     }
 }
 
+#[cynic::query_module(
+    schema_path = "schema.graphql",
+    query_module = "query_dsl",
+)]
+pub mod set_duration {
+    use crate::graphql::{query_dsl, types::*};
 
+    ///```graphql
+    /// mutation {
+    ///     updateTimeBlock(input: {
+    ///       filter: {id: {eq: "[time_block id]"}}
+    ///       set: { duration: 36000 }
+    ///     }) {
+    ///       numUids
+    ///     }
+    ///   }
+    ///```
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(
+        graphql_type = "Mutation",
+        argument_struct = "SetTimeBlockDurationArguments",
+    )]
+    pub struct Mutation {
+        #[arguments(input = UpdateTimeBlockInput {
+            filter: TimeBlockFilter {
+                id: Some(StringHashFilter {
+                    eq: Some(args.id.clone()),
+                }),
+            },
+            set: Some(TimeBlockPatch {
+                duration: Some(args.duration),
+            }),
+        })]
+        pub update_time_block: Option<UpdateTimeBlockPayload>,
+    }
+
+    #[derive(cynic::FragmentArguments, Debug)]
+    pub struct SetTimeBlockDurationArguments {
+        pub id: String,
+        pub duration: i32,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "UpdateTimeBlockInput")]
+    pub struct UpdateTimeBlockInput {
+        pub filter: TimeBlockFilter,
+        pub set: Option<TimeBlockPatch>,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "TimeBlockFilter")]
+    pub struct TimeBlockFilter {
+        pub id: Option<StringHashFilter>,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "StringHashFilter")]
+    pub struct StringHashFilter {
+        pub eq: Option<String>,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "TimeBlockPatch")]
+    pub struct TimeBlockPatch {
+        pub duration: Option<i32>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "UpdateTimeBlockPayload")]
+    pub struct UpdateTimeBlockPayload {
+        pub num_uids: Option<i32>,
+    }
+}
+
+#[cynic::query_module(
+    schema_path = "schema.graphql",
+    query_module = "query_dsl",
+)]
+pub mod set_status {
+    use crate::graphql::{query_dsl, types::*};
+
+    ///```graphql
+    /// mutation {
+    ///     updateTimeBlock(input: {
+    ///       filter: {id: {eq: "[time_block id]"}}
+    ///       set: { status: PAID }
+    ///     }) {
+    ///       numUids
+    ///     }
+    ///   }
+    ///```
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(
+        graphql_type = "Mutation",
+        argument_struct = "SetTimeBlockStatusArguments",
+    )]
+    pub struct Mutation {
+        #[arguments(input = UpdateTimeBlockInput {
+            filter: TimeBlockFilter {
+                id: Some(StringHashFilter {
+                    eq: Some(args.id.clone()),
+                }),
+            },
+            set: Some(TimeBlockPatch {
+                status: Some(args.status),
+            }),
+        })]
+        pub update_time_block: Option<UpdateTimeBlockPayload>,
+    }
+
+    #[derive(cynic::FragmentArguments, Debug)]
+    pub struct SetTimeBlockStatusArguments {
+        pub id: String,
+        pub status: TimeBlockStatus,
+    }
+
+    #[derive(cynic::Enum, Debug, Copy, Clone)]
+    #[cynic(graphql_type = "TimeBlockStatus", rename_all = "SCREAMING_SNAKE_CASE")]
+    pub enum TimeBlockStatus {
+        NonBillable,
+        Unpaid,
+        Paid,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "UpdateTimeBlockInput")]
+    pub struct UpdateTimeBlockInput {
+        pub filter: TimeBlockFilter,
+        pub set: Option<TimeBlockPatch>,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "TimeBlockFilter")]
+    pub struct TimeBlockFilter {
+        pub id: Option<StringHashFilter>,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "StringHashFilter")]
+    pub struct StringHashFilter {
+        pub eq: Option<String>,
+    }
+
+    #[derive(cynic::InputObject, Debug)]
+    #[cynic(graphql_type = "TimeBlockPatch")]
+    pub struct TimeBlockPatch {
+        pub status: Option<TimeBlockStatus>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "UpdateTimeBlockPayload")]
+    pub struct UpdateTimeBlockPayload {
+        pub num_uids: Option<i32>,
+    }
+}
