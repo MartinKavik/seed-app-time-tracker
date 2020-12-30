@@ -3,7 +3,7 @@ use seed::{prelude::*, *};
 use chrono::prelude::*;
 use ulid::Ulid;
 
-use cynic::QueryFragment;
+use cynic::{QueryBuilder, MutationBuilder};
 
 use std::collections::BTreeMap;
 use std::convert::identity;
@@ -51,7 +51,7 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
     );
 
     Ok(
-        graphql::send_query(query_mod::Query::fragment(&()))
+        graphql::send_operation(query_mod::Query::build(()))
             .await?
             .query_client
             .expect("get clients")
@@ -184,8 +184,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     user: "DUMMY_USER_ID".to_owned(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::client::add::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::client::add::Mutation::build(&args)
                     ).await.err()
                 )});
 
@@ -200,13 +200,13 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 
                 if let Ok(true) = window().confirm_with_message(&format!("Client \"{}\" will be deleted.", client_name)) {
                     clients.remove(&client_id);
-                    
+
                     let args = graphql::mutations::client::delete::DeleteClientArguments {
                         id: client_id.to_string(),
                     };
                     orders.perform_cmd(async move { Msg::ChangesSaved(
-                        graphql::send_mutation(
-                            graphql::mutations::client::delete::Mutation::fragment(&args)
+                        graphql::send_operation(
+                            graphql::mutations::client::delete::Mutation::build(&args)
                         ).await.err()
                     )});
                 }
@@ -251,8 +251,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     name: name.clone(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::client::rename::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::client::rename::Mutation::build(&args)
                     ).await.err()
                 )});
                 Some(())
@@ -271,14 +271,14 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     name: "".to_owned(),
                     name_input: ElRef::new(),
                 };
-                
+
                 let args = graphql::mutations::project::add::AddProjectArguments {
                     id: project_id.to_string(),
                     client: client_id.to_string(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::project::add::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::project::add::Mutation::build(&args)
                     ).await.err()
                 )});
 
@@ -296,13 +296,13 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 
                 if let Ok(true) = window().confirm_with_message(&format!("Project \"{}\" will be deleted.", project_name)) {
                     projects.remove(&project_id);
-                    
+
                     let args = graphql::mutations::project::delete::DeleteProjectArguments {
                         id: project_id.to_string(),
                     };
                     orders.perform_cmd(async move { Msg::ChangesSaved(
-                        graphql::send_mutation(
-                            graphql::mutations::project::delete::Mutation::fragment(&args)
+                        graphql::send_operation(
+                            graphql::mutations::project::delete::Mutation::build(&args)
                         ).await.err()
                     )});
 
@@ -354,8 +354,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     name: name.clone(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::project::rename::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::project::rename::Mutation::build(&args)
                     ).await.err()
                 )});
                 Some(())

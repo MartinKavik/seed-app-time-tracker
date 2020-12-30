@@ -43,7 +43,7 @@ pub mod add {
     }
 
     #[derive(cynic::InputObject, Debug)]
-    #[cynic(graphql_type = "AddClientInput")]
+    #[cynic(graphql_type = "AddClientInput", rename_all = "None")]
     pub struct AddClientInput {
         id: String,
         name: String,
