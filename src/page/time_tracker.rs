@@ -3,7 +3,7 @@ use seed::{prelude::*, *};
 use chrono::prelude::*;
 use ulid::Ulid;
 
-use cynic::QueryFragment;
+use cynic::{QueryBuilder, MutationBuilder};
 
 use std::collections::BTreeMap;
 use std::convert::identity;
@@ -63,7 +63,7 @@ async fn request_clients() -> graphql::Result<BTreeMap<ClientId, Client>> {
     );
 
     Ok(
-        graphql::send_query(query_mod::Query::fragment(&()))
+        graphql::send_operation(query_mod::Query::build(&()))
             .await?
             .query_client
             .expect("get clients")
@@ -229,8 +229,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     project: project_id.to_string(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::time_entry::add::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::time_entry::add::Mutation::build(&args)
                     ).await.err()
                 )});
 
@@ -260,8 +260,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     stopped: time_entry.stopped.clone(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::time_entry::set_times::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::time_entry::set_times::Mutation::build(&args)
                     ).await.err()
                 )});
 
@@ -289,8 +289,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                         id: time_entry_id.to_string(),
                     };
                     orders.perform_cmd(async move { Msg::ChangesSaved(
-                        graphql::send_mutation(
-                            graphql::mutations::time_entry::delete::Mutation::fragment(&args)
+                        graphql::send_operation(
+                            graphql::mutations::time_entry::delete::Mutation::build(&args)
                         ).await.err()
                     )});
                 }
@@ -330,8 +330,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     name: name.clone(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::time_entry::rename::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::time_entry::rename::Mutation::build(&args)
                     ).await.err()
                 )});
                 Some(())
@@ -468,8 +468,8 @@ pub fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                     stopped: time_entry.stopped.clone(),
                 };
                 orders.perform_cmd(async move { Msg::ChangesSaved(
-                    graphql::send_mutation(
-                        graphql::mutations::time_entry::set_times::Mutation::fragment(&args)
+                    graphql::send_operation(
+                        graphql::mutations::time_entry::set_times::Mutation::build(&args)
                     ).await.err()
                 )});
                 Some(())

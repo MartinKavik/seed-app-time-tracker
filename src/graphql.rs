@@ -4,46 +4,21 @@ use cynic;
 
 pub type Result<T> = std::result::Result<T, GraphQLError>;
 
-pub async fn send_query<'a, ResponseData: 'a, Root: cynic::QueryRoot>(
-    selection_set: cynic::SelectionSet<'a, ResponseData, Root>
+pub async fn send_operation<'a, ResponseData: 'a>(
+    operation: cynic::Operation<'a, ResponseData>
 ) -> Result<ResponseData> {
-    let query = cynic::Operation::query(selection_set);
-
-    let graphql_response = 
+    let graphql_response =
         // @TODO: Move url to a config file.
         Request::new("https://time-tracker.eu-central-1.aws.cloud.dgraph.io/graphql")
             .method(Method::Post)
-            .json(&query)?
+            .json(&operation)?
             .fetch()
             .await?
             .check_status()?
             .json()
             .await?;
 
-    let response_data = query.decode_response(graphql_response)?;
-    if let Some(errors) = response_data.errors {
-        Err(errors)?
-    }
-    Ok(response_data.data.expect("response data"))
-}
-
-pub async fn send_mutation<'a, ResponseData: 'a, Root: cynic::MutationRoot>(
-    selection_set: cynic::SelectionSet<'a, ResponseData, Root>
-) -> Result<ResponseData> {
-    let mutation = cynic::Operation::mutation(selection_set);
-
-    let graphql_response = 
-        // @TODO: Move url to a config file.
-        Request::new("https://time-tracker.eu-central-1.aws.cloud.dgraph.io/graphql")
-            .method(Method::Post)
-            .json(&mutation)?
-            .fetch()
-            .await?
-            .check_status()?
-            .json()
-            .await?;
-
-    let response_data = mutation.decode_response(graphql_response)?;
+    let response_data = operation.decode_response(graphql_response)?;
     if let Some(errors) = response_data.errors {
         Err(errors)?
     }

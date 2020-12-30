@@ -4,7 +4,7 @@
 )]
 pub mod add {
     use crate::graphql::{query_dsl, types::*};
-    
+
     ///```graphql
     /// mutation {
     ///     addInvoice(input: {
@@ -39,7 +39,7 @@ pub mod add {
     }
 
     #[derive(cynic::InputObject, Debug)]
-    #[cynic(graphql_type = "AddInvoiceInput")]
+    #[cynic(graphql_type = "AddInvoiceInput", rename_all = "None")]
     pub struct AddInvoiceInput {
         id: String,
         time_block: TimeBlockRef,
@@ -120,7 +120,7 @@ pub mod set_custom_id {
     }
 
     #[derive(cynic::InputObject, Debug)]
-    #[cynic(graphql_type = "InvoicePatch")]
+    #[cynic(graphql_type = "InvoicePatch", rename_all = "None")]
     pub struct InvoicePatch {
         pub custom_id: Option<String>,
     }

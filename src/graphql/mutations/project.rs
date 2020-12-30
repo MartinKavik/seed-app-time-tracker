@@ -4,7 +4,7 @@
 )]
 pub mod add {
     use crate::graphql::{query_dsl, types::*};
-    
+
     ///```graphql
     /// mutation {
     ///     addProject(input: {
@@ -43,7 +43,7 @@ pub mod add {
     }
 
     #[derive(cynic::InputObject, Debug)]
-    #[cynic(graphql_type = "AddProjectInput")]
+    #[cynic(graphql_type = "AddProjectInput", rename_all = "None")]
     pub struct AddProjectInput {
         id: String,
         name: String,
